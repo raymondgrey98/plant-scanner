@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Plant Scanner</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Plant Scanner</h1>
+      <p class="tag">Upload a plant photo to identify it and get fertilizer, disease and soil advice.</p>
+    </header>
+
+    <main>
+      <section class="card upload-card">
+        <form id="scan-form">
+          <label class="file-label" for="photo">
+            <span id="file-label-text">Choose a plant photo</span>
+            <input id="photo" name="photo" type="file" accept="image/*" required />
+          </label>
+          <img id="preview" alt="" hidden />
+          <button id="scan-btn" type="submit" disabled>Scan</button>
+        </form>
+        <p id="status" class="status"></p>
+      </section>
+
+      <section id="result" class="card result-card" hidden>
+        <h2>Result</h2>
+        <div class="grid">
+          <div class="result-block"><h3>Plant</h3><p id="r-plant"></p></div>
+          <div class="result-block"><h3>Disease</h3><p id="r-disease"></p></div>
+          <div class="result-block"><h3>Fertilizer</h3><p id="r-fertilizer"></p></div>
+          <div class="result-block"><h3>Soil &amp; Water</h3><p id="r-soil"></p></div>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>History</h2>
+        <ul id="history" class="history"></ul>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
