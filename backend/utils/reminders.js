@@ -1,31 +1,53 @@
 const cron = require('node-cron');
 const { query } = require('../db');
-const { sendReminderEmail, sendReminderSms } = require('./email');
+const { sendReminderEmail } = require('./email');
 
-function startReminderScheduler() {
-  cron.schedule('*/5 * * * *', async () => {
+const activeTasks = new Map();
+
+function scheduleOne(reminder) {
+  if (!cron.validate(reminder.cron_expression)) {
+    console.warn(`[reminders] Invalid cron for reminder ${reminder.id}: ${reminder.cron_expression}`);
+    return;
+  }
+  const existing = activeTasks.get(reminder.id);
+  if (existing) existing.stop();
+
+  const task = cron.schedule(reminder.cron_expression, async () => {
+    const subject = `FloraIQ Reminder: ${reminder.title}`;
+    const html = `
+      <div style="font-family:sans-serif;max-width:480px;padding:24px;background:#09090b;color:#e4e4e7;border-radius:12px">
+        <h2 style="color:#22c55e;margin:0 0 12px">FloraIQ Plant Reminder</h2>
+        <p style="margin:0 0 16px;font-size:15px">${reminder.title}</p>
+        <p style="color:#71717a;font-size:12px;margin:0">You set this reminder via FloraIQ. To stop receiving it, contact support.</p>
+      </div>`;
     try {
-      const now = new Date();
-      const reminders = await query('SELECT r.*, u.email FROM reminders r JOIN users u ON u.id = r.user_id WHERE r.active = TRUE');
-      for (const reminder of reminders.rows) {
-        if (!cron.validate(reminder.cron_expression)) continue;
-        const task = cron.schedule(reminder.cron_expression, async () => {
-          const subject = `Plant Reminder: ${reminder.title}`;
-          const body = `<p>Hi! This is your scheduled plant reminder:</p><p><strong>${reminder.title}</strong></p>`;
-          if (reminder.channel === 'sms') {
-            await sendReminderSms(reminder.destination, `${subject}\n${body}`);
-          } else {
-            await sendReminderEmail(reminder.destination, subject, body);
-          }
-          await query('UPDATE reminders SET last_sent = $1 WHERE id = $2', [new Date(), reminder.id]);
-          task.stop();
-        });
-        task.start();
-      }
+      await sendReminderEmail(reminder.destination, subject, html);
+      await query('UPDATE reminders SET last_sent = NOW() WHERE id = $1', [reminder.id]);
     } catch (err) {
-      console.error('Reminder scheduler error', err);
+      console.error(`[reminders] Failed to send reminder ${reminder.id}:`, err.message);
     }
-  });
+  }, { timezone: 'UTC' });
+
+  activeTasks.set(reminder.id, task);
 }
 
-module.exports = { startReminderScheduler };
+async function startReminderScheduler() {
+  try {
+    const result = await query('SELECT * FROM reminders WHERE active = TRUE');
+    for (const r of result.rows) scheduleOne(r);
+    console.log(`[reminders] Scheduled ${result.rows.length} active reminder(s)`);
+  } catch (err) {
+    console.error('[reminders] Startup error:', err.message);
+  }
+}
+
+function addReminder(reminder) {
+  scheduleOne(reminder);
+}
+
+function removeReminder(id) {
+  const task = activeTasks.get(id);
+  if (task) { task.stop(); activeTasks.delete(id); }
+}
+
+module.exports = { startReminderScheduler, addReminder, removeReminder };

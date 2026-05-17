@@ -53,4 +53,42 @@ router.get('/library/latest', requireAuth, async (req, res, next) => {
   }
 });
 
+router.post('/', async (req, res, next) => {
+  try {
+    const {
+      scientific_name, common_name, care_summary, watering, fertilizer,
+      sunlight, soil, propagation, uses, image_url, habitat, disease, pest,
+    } = req.body;
+    if (!common_name && !scientific_name) {
+      return res.status(400).json({ error: 'common_name or scientific_name is required' });
+    }
+    const existing = await query(
+      `SELECT id, common_name, scientific_name FROM plants
+       WHERE (scientific_name IS NOT NULL AND scientific_name ILIKE $1)
+          OR (common_name    IS NOT NULL AND common_name    ILIKE $2)
+       LIMIT 1`,
+      [scientific_name || '', common_name || '']
+    );
+    if (existing.rows.length) {
+      return res.json({ plant: existing.rows[0], existed: true });
+    }
+    const result = await query(
+      `INSERT INTO plants
+         (scientific_name, common_name, care_summary, watering, fertilizer,
+          sunlight, soil, propagation, uses, image_url, habitat, disease, pest)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       RETURNING id, common_name, scientific_name`,
+      [
+        scientific_name || null, common_name || null, care_summary || null,
+        watering || null, fertilizer || null, sunlight || null, soil || null,
+        propagation || null, uses || null, image_url || null,
+        habitat || null, disease || null, pest || null,
+      ]
+    );
+    res.status(201).json({ plant: result.rows[0] });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
