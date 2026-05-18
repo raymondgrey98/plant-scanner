@@ -122,7 +122,7 @@ function LangSwitcher() {
 
 // ── UI Atoms ──────────────────────────────────────────────────
 const Card = ({ children, className = '', onClick }) => (
-  <div onClick={onClick} className={`bg-zinc-900 border border-zinc-800 rounded-xl ${onClick ? 'cursor-pointer hover:border-zinc-700 transition-colors' : ''} ${className}`}>{children}</div>
+  <div onClick={onClick} className={`glass-card ${onClick ? 'cursor-pointer' : ''} ${className}`}>{children}</div>
 );
 
 const Badge = ({ children, color = 'zinc' }) => {
@@ -132,11 +132,11 @@ const Badge = ({ children, color = 'zinc' }) => {
 
 const Btn = ({ children, onClick, variant = 'primary', size = 'md', className = '', disabled, type = 'button' }) => {
   const variants = {
-    primary: 'bg-green-500 hover:bg-green-400 text-black font-bold',
-    secondary: 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200',
+    primary: 'btn-violet',
+    secondary: 'bg-white/5 hover:bg-white/10 text-zinc-200 border border-white/8',
     danger: 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30',
     survival: 'bg-amber-500 hover:bg-amber-400 text-black font-bold',
-    ghost: 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800',
+    ghost: 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5',
   };
   const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
   return (
@@ -149,7 +149,7 @@ const Btn = ({ children, onClick, variant = 'primary', size = 'md', className = 
 const Input = ({ label, error, className = '', ...props }) => (
   <div className={className}>
     {label && <label className="block text-xs font-medium text-zinc-400 mb-1">{label}</label>}
-    <input {...props} className={`w-full px-3 py-2 bg-zinc-900 border ${error ? 'border-red-500' : 'border-zinc-700'} rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-green-500 transition-colors`} />
+    <input {...props} className={`w-full px-3 py-2 bg-white/5 border ${error ? 'border-red-500' : 'border-white/10'} rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors`} />
     {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
   </div>
 );
@@ -157,7 +157,7 @@ const Input = ({ label, error, className = '', ...props }) => (
 const Textarea = ({ label, className = '', ...props }) => (
   <div className={className}>
     {label && <label className="block text-xs font-medium text-zinc-400 mb-1">{label}</label>}
-    <textarea {...props} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-green-500 transition-colors resize-none" />
+    <textarea {...props} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors resize-none" />
   </div>
 );
 
@@ -171,9 +171,9 @@ function Modal({ open, onClose, title, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-y-auto max-h-[90vh]">
+      <div className="relative glass-card w-full max-w-lg overflow-y-auto max-h-[90vh]" style={{ background: 'rgba(8,8,22,0.95)' }}>
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">
             <h3 className="font-semibold text-zinc-100">{title}</h3>
             <button onClick={onClose} className="text-zinc-600 hover:text-zinc-400 text-xl leading-none">×</button>
           </div>
@@ -279,16 +279,16 @@ function Navbar({ active, onNav, notifCount, onOpenNotifs, showNotifs, onCloseNo
   const online = useOnlineStatus();
   const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-50 bg-zinc-950/95 border-b border-zinc-800 backdrop-blur-sm">
+    <header className="sticky top-0 z-50 glass-nav border-b">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14 relative">
         <button onClick={() => onNav('home')} className="font-display font-extrabold text-lg text-white tracking-tight shrink-0">
-          Flora<span className="text-green-500">IQ</span>
+          Flora<span className="gradient-text">IQ</span>
           {!online && <span className="ml-2 text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-2 py-0.5">Offline</span>}
         </button>
         <nav className="hidden lg:flex items-center gap-1 mx-4">
           {NAV_ITEMS.map(n => (
             <button key={n.id} onClick={() => onNav(n.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${active === n.id ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'}`}>
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${active === n.id ? 'bg-violet-500/20 text-violet-300 border border-violet-500/25' : 'text-slate-400 hover:text-white hover:bg-white/6'}`}>
               {n.icon} {n.label}
             </button>
           ))}
@@ -305,18 +305,18 @@ function Navbar({ active, onNav, notifCount, onOpenNotifs, showNotifs, onCloseNo
             </button>
           ) : (
             <>
-              <button onClick={() => onNav('login')} className="px-3 py-1.5 text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors">Sign in</button>
-              <button onClick={() => onNav('signup')} className="px-3 py-1.5 text-xs font-bold bg-green-500 hover:bg-green-400 text-black rounded-lg transition-colors">Sign up</button>
+              <button onClick={() => onNav('login')} className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-white/6 rounded-lg transition-colors">Sign in</button>
+              <button onClick={() => onNav('signup')} className="btn-violet px-3 py-1.5 text-xs rounded-lg">Sign up</button>
             </>
           )}
           <button onClick={() => setMenuOpen(o => !o)} className="lg:hidden p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors text-lg">☰</button>
         </div>
         <NotifPanel open={showNotifs} onClose={onCloseNotifs} />
         {menuOpen && (
-          <div className="lg:hidden absolute right-4 top-14 z-50 bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl py-2 w-52">
+          <div className="lg:hidden absolute right-4 top-14 z-50 glass-card py-2 w-52 shadow-2xl">
             {NAV_ITEMS.map(n => (
               <button key={n.id} onClick={() => { onNav(n.id); setMenuOpen(false); }}
-                className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-lg text-sm font-medium mb-0.5 mx-1 transition-colors ${active === n.id ? 'bg-zinc-800 text-white' : 'text-zinc-400 hover:bg-zinc-800/60'}`}>
+                className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-lg text-sm font-medium mb-0.5 mx-1 transition-colors ${active === n.id ? 'bg-violet-500/20 text-violet-300' : 'text-slate-400 hover:bg-white/6'}`}>
                 {n.icon} {n.label}
               </button>
             ))}
@@ -336,10 +336,10 @@ function Navbar({ active, onNav, notifCount, onOpenNotifs, showNotifs, onCloseNo
 
 function BottomNav({ active, onNav }) {
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-zinc-950/95 border-t border-zinc-800 backdrop-blur-sm flex">
+    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 glass-nav border-t flex">
       {BOTTOM_NAV.map(n => (
         <button key={n.id} onClick={() => onNav(n.id)}
-          className={`flex-1 flex flex-col items-center py-2 gap-0.5 transition-colors ${active === n.id ? 'text-green-400' : 'text-zinc-500'}`}>
+          className={`flex-1 flex flex-col items-center py-2 gap-0.5 transition-colors ${active === n.id ? 'text-violet-400' : 'text-slate-500'}`}>
           <span className="text-lg">{n.icon}</span>
           <span className="text-[9px] font-medium">{n.label}</span>
         </button>
@@ -712,36 +712,58 @@ function HomePage({ onNav }) {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 pb-28">
-      <div className="text-center mb-10">
-        <h1 className="text-4xl font-extrabold text-white mb-3">Flora<span className="text-green-500">IQ</span></h1>
-        <p className="text-zinc-400 text-lg max-w-2xl mx-auto">AI-powered plant intelligence for hikers, farmers, foragers, and nature enthusiasts worldwide.</p>
+      {/* Hero */}
+      <div className="text-center mb-12">
+        {/* Isometric 3D hero art */}
+        <div className="iso-hero">
+          <div className="iso-glow" />
+          <div className="iso-platform" />
+          <div className="iso-inner" />
+          <div className="iso-icon">🌿</div>
+          <div className="iso-particle" />
+          <div className="iso-particle" />
+          <div className="iso-particle" />
+          <div className="iso-particle" />
+        </div>
+
+        <h1 className="text-5xl font-extrabold text-white mb-3 tracking-tight">
+          Flora<span className="gradient-text">IQ</span>
+        </h1>
+        <p className="text-slate-400 text-lg max-w-2xl mx-auto leading-relaxed">
+          AI-powered plant intelligence for hikers, farmers, foragers, and nature enthusiasts worldwide.
+        </p>
+
         {stats && (
-          <div className="flex items-center justify-center gap-6 mt-4 text-sm text-zinc-500">
-            <span>🌿 <strong className="text-zinc-300">{(stats.total_scans || 0).toLocaleString()}</strong> scans</span>
-            <span>🗺️ <strong className="text-zinc-300">{(stats.species_count || 0).toLocaleString()}</strong> species</span>
-            <span>🌍 <strong className="text-zinc-300">{(stats.country_count || 0).toLocaleString()}</strong> countries</span>
+          <div className="flex items-center justify-center gap-4 mt-5 flex-wrap">
+            <div className="stat-glow"><span className="text-xl font-bold text-violet-300">{(stats.total_scans||0).toLocaleString()}</span><p className="text-xs text-slate-500 mt-0.5">Scans</p></div>
+            <div className="stat-glow"><span className="text-xl font-bold text-blue-300">{(stats.species_count||0).toLocaleString()}</span><p className="text-xs text-slate-500 mt-0.5">Species</p></div>
+            <div className="stat-glow"><span className="text-xl font-bold text-teal-300">{(stats.country_count||0).toLocaleString()}</span><p className="text-xs text-slate-500 mt-0.5">Countries</p></div>
           </div>
         )}
-        <div className="flex items-center justify-center gap-3 mt-6">
+
+        <div className="flex items-center justify-center gap-3 mt-7 flex-wrap">
           <Btn onClick={() => onNav('scan')} size="lg">📷 Identify Now</Btn>
           <Btn onClick={() => onNav('survival')} variant="survival" size="lg">🏕️ Survival Mode</Btn>
           <Btn onClick={() => onNav('landscape')} variant="secondary" size="lg">🌍 Landscape</Btn>
         </div>
       </div>
+
+      {/* Feature grid */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         {features.map((f, i) => (
-          <Card key={i} onClick={() => onNav(f.action)} className="p-4 cursor-pointer hover:border-green-500/30 transition-colors">
-            <div className="text-2xl mb-2">{f.icon}</div>
+          <Card key={i} onClick={() => onNav(f.action)} className="p-5 cursor-pointer">
+            <div className="feature-icon-bubble">{f.icon}</div>
             <h3 className="text-sm font-bold text-zinc-100 mb-1">{f.title}</h3>
-            <p className="text-xs text-zinc-500 leading-relaxed">{f.desc}</p>
+            <p className="text-xs text-slate-500 leading-relaxed">{f.desc}</p>
           </Card>
         ))}
       </div>
+
       {!user && (
-        <Card className="p-8 text-center bg-gradient-to-br from-green-500/10 to-zinc-900">
+        <Card className="p-8 text-center" style={{ background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(59,130,246,0.08))' }}>
           <h2 className="text-xl font-bold text-white mb-2">Start your FloraIQ journey</h2>
-          <p className="text-sm text-zinc-400 mb-6">Free forever. No credit card. Access all features with an account.</p>
-          <div className="flex items-center justify-center gap-3">
+          <p className="text-sm text-slate-400 mb-6">Free forever. No credit card. Access all features with an account.</p>
+          <div className="flex items-center justify-center gap-3 flex-wrap">
             <Btn onClick={() => onNav('signup')} size="lg">Create Free Account</Btn>
             <Btn onClick={() => onNav('scan')} variant="secondary" size="lg">Try Without Account</Btn>
           </div>
@@ -2671,6 +2693,104 @@ function RegionIntelResult({ intel, riskColor }) {
 
 
 
+// ── FloraBot Chatbot ──────────────────────────────────────────
+function FloraBot() {
+  const [open, setOpen] = useState(false);
+  const [msgs, setMsgs] = useState([
+    { role: 'bot', text: "Hi! I'm FloraBot 🌿 Ask me anything about plants, foraging, survival, or nature!" }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const msgsEndRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (open) {
+      setTimeout(() => msgsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+      inputRef.current?.focus();
+    }
+  }, [open, msgs]);
+
+  const SUGGESTIONS = ['Is this plant edible?', 'Survival tips?', 'Treat an insect sting?', 'Identify mushrooms safely?'];
+
+  const send = async (text) => {
+    const q = (text || input).trim();
+    if (!q || loading) return;
+    setInput('');
+    setMsgs(m => [...m, { role: 'user', text: q }]);
+    setLoading(true);
+    try {
+      const r = await fetch(`${API}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ message: q }),
+      });
+      const d = await r.json();
+      setMsgs(m => [...m, { role: 'bot', text: d.reply || d.message || d.response || "I couldn't process that. Try again!" }]);
+    } catch {
+      setMsgs(m => [...m, { role: 'bot', text: "Connection issue — please try again in a moment." }]);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <>
+      <button className="florabot-fab" onClick={() => setOpen(o => !o)} title="Chat with FloraBot">
+        {open ? '✕' : '🌿'}
+      </button>
+      {open && (
+        <div className="florabot-panel">
+          <div className="florabot-header">
+            <div className="florabot-avatar">🌿</div>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontSize: '14px', fontWeight: 700, color: 'white' }}>FloraBot</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                <div className="florabot-online-dot" />
+                <p style={{ margin: 0, fontSize: '11px', color: '#a78bfa' }}>AI Plant Assistant</p>
+              </div>
+            </div>
+            <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#475569', fontSize: '20px', lineHeight: 1 }}>×</button>
+          </div>
+
+          <div className="florabot-messages">
+            {msgs.map((m, i) => (
+              <div key={i} className={`florabot-msg ${m.role}`}>{m.text}</div>
+            ))}
+            {loading && (
+              <div className="florabot-msg bot">
+                <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+              </div>
+            )}
+            <div ref={msgsEndRef} />
+          </div>
+
+          {msgs.length <= 2 && (
+            <div className="florabot-suggestions">
+              {SUGGESTIONS.map(s => (
+                <button key={s} className="florabot-chip" onClick={() => send(s)}>{s}</button>
+              ))}
+            </div>
+          )}
+
+          <div className="florabot-input-row">
+            <input
+              ref={inputRef}
+              className="florabot-input"
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && send()}
+              placeholder="Ask about plants…"
+              disabled={loading}
+            />
+            <button className="florabot-send" onClick={() => send()} disabled={loading || !input.trim()}>➤</button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState('home');
@@ -2715,7 +2835,7 @@ export default function App() {
   return (
     <AuthProvider>
       <ErrorBoundary>
-        <div className="min-h-screen bg-zinc-950 text-zinc-100">
+        <div className="min-h-screen text-slate-100">
           <Navbar
             active={page}
             onNav={onNav}
@@ -2742,11 +2862,12 @@ export default function App() {
             {page === 'forgot'    && <ForgotPage onNav={onNav} />}
           </main>
           <BottomNav active={page} onNav={onNav} />
+          <FloraBot />
           {installPrompt && (
-            <div className="fixed bottom-20 left-4 right-4 lg:left-auto lg:right-4 lg:w-80 bg-zinc-900 border border-zinc-700 rounded-2xl p-4 flex items-center justify-between shadow-2xl z-50">
+            <div className="fixed bottom-20 left-4 right-4 lg:left-auto lg:right-4 lg:w-80 glass-card p-4 flex items-center justify-between shadow-2xl z-50">
               <span className="text-sm text-zinc-300">Install FloraIQ for offline use</span>
               <div className="flex gap-2">
-                <button onClick={installPwa} className="px-3 py-1.5 bg-green-500 text-black text-xs font-bold rounded-lg hover:bg-green-400 transition-colors">Install</button>
+                <button onClick={installPwa} className="btn-violet px-3 py-1.5 text-xs rounded-lg">Install</button>
                 <button onClick={() => setInstallPrompt(null)} className="text-zinc-600 hover:text-zinc-400 text-xs px-2">×</button>
               </div>
             </div>
