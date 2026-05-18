@@ -155,7 +155,7 @@ Reply ONLY with a valid JSON object:
 // ── Gemini landscape analysis ────────────────────────────────────
 async function analyzeWithGemini(filePath, prompt) {
   if (!GEMINI_API_KEY) return null;
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const imageData = fs.readFileSync(filePath).toString('base64');
   const mime = mimeFor(filePath);
   const body = {
@@ -167,7 +167,8 @@ async function analyzeWithGemini(filePath, prompt) {
   });
   if (!r.ok) throw new Error(`Gemini ${r.status}`);
   const d = await r.json();
-  const text = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const parts = d.candidates?.[0]?.content?.parts || [];
+  const text = parts.find(p => p.text && !p.thought)?.text || parts[0]?.text || '';
   const match = text.match(/\{[\s\S]*\}/);
   return match ? JSON.parse(match[0]) : null;
 }
@@ -211,12 +212,48 @@ async function analyzeWithClaude(filePath, prompt) {
   return match ? JSON.parse(match[0]) : null;
 }
 
+async function analyzeWithOpenRouter(filePath, prompt) {
+  if (!OPENROUTER_KEY) return null;
+  const imageData = fs.readFileSync(filePath).toString('base64');
+  const mime = mimeFor(filePath);
+  const visionModels = [
+    process.env.OPENROUTER_VISION_MODEL || 'nvidia/nemotron-nano-12b-v2-vl:free',
+    'google/gemma-4-31b-it:free',
+    'google/gemma-4-26b-a4b-it:free',
+  ];
+  for (const model of visionModels) {
+    try {
+      const body = {
+        model,
+        messages: [{ role: 'user', content: [
+          { type: 'text', text: prompt },
+          { type: 'image_url', image_url: { url: `data:${mime};base64,${imageData}` } },
+        ]}],
+        max_tokens: 4096, temperature: 0.3,
+      };
+      const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENROUTER_KEY}`, 'HTTP-Referer': 'https://floraiq.app', 'X-Title': 'FloraIQ' },
+        body: JSON.stringify(body),
+      });
+      if (r.status === 429) { logger.warn(`OpenRouter vision rate limited on ${model}`); continue; }
+      if (!r.ok) { logger.warn(`OpenRouter vision ${model} returned ${r.status}`); continue; }
+      const d = await r.json();
+      const text = d.choices?.[0]?.message?.content || '';
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) return JSON.parse(match[0]);
+    } catch (e) { logger.warn(`OpenRouter vision ${model} error: ${e.message}`); }
+  }
+  return null;
+}
+
 async function runLandscapeChain(filePath, geoHint) {
   const prompt = buildLandscapePrompt(geoHint);
   const providers = [
-    { name: 'Gemini', fn: () => analyzeWithGemini(filePath, prompt) },
-    { name: 'OpenAI', fn: () => analyzeWithOpenAI(filePath, prompt) },
-    { name: 'Claude', fn: () => analyzeWithClaude(filePath, prompt) },
+    { name: 'Gemini',      fn: () => analyzeWithGemini(filePath, prompt) },
+    { name: 'OpenAI',      fn: () => analyzeWithOpenAI(filePath, prompt) },
+    { name: 'Claude',      fn: () => analyzeWithClaude(filePath, prompt) },
+    { name: 'OpenRouter',  fn: () => analyzeWithOpenRouter(filePath, prompt) },
   ];
   for (const provider of providers) {
     try {
@@ -436,14 +473,15 @@ async function callTextAI(prompt, lang) {
   // Try Gemini text
   if (GEMINI_API_KEY) {
     try {
-      const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+      const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
       const body = { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.4, maxOutputTokens: 8192 } };
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       });
       if (r.ok) {
         const d = await r.json();
-        const text = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const parts = d.candidates?.[0]?.content?.parts || [];
+        const text = parts.find(p => p.text && !p.thought)?.text || parts[0]?.text || '';
         const match = text.match(/\{[\s\S]*\}/);
         if (match) return JSON.parse(match[0]);
       }
@@ -465,7 +503,44 @@ async function callTextAI(prompt, lang) {
       }
     } catch { }
   }
-  throw new Error('No AI provider available for text analysis');
+  // Try OpenRouter (text mode — free fallback, try multiple models)
+  if (OPENROUTER_KEY) {
+    const textModels = [
+      process.env.OPENROUTER_TEXT_MODEL || 'google/gemma-4-31b-it:free',
+      'deepseek/deepseek-v4-flash:free',
+      'qwen/qwen3-coder:free',
+    ];
+    for (const model of textModels) {
+      try {
+        const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${OPENROUTER_KEY}`,
+            'HTTP-Referer': 'https://floraiq.app',
+            'X-Title': 'FloraIQ',
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: 'system', content: 'You are an expert botanist and survival instructor. Always reply with valid JSON only — no markdown, no explanation, just the JSON object.' },
+              { role: 'user', content: prompt },
+            ],
+            max_tokens: 4096,
+            temperature: 0.3,
+          }),
+        });
+        if (r.status === 429) { logger.warn(`OpenRouter text rate limited on ${model}`); continue; }
+        if (!r.ok) { logger.warn(`OpenRouter text ${model} returned ${r.status}`); continue; }
+        const d = await r.json();
+        const text = d.choices?.[0]?.message?.content || '';
+        const match = text.match(/\{[\s\S]*\}/);
+        if (match) return JSON.parse(match[0]);
+      } catch (e) { logger.warn(`OpenRouter text ${model} error: ${e.message}`); }
+    }
+    throw new Error('AI rate limited. Try again in 1 minute, or add a GEMINI_API_KEY to .env for unlimited free requests.');
+  }
+  throw new Error('No AI key configured. Add GEMINI_API_KEY (free at aistudio.google.com) to your .env file.');
 }
 
 module.exports = router;

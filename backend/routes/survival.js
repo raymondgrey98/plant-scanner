@@ -69,6 +69,19 @@ function buildSurvivalPriority(a) {
   return items.sort((a, b) => a.priority - b.priority);
 }
 
+// ── GET /api/survival/guide (built-in guide, no AI needed) ───
+router.get('/guide', (_req, res) => {
+  res.json({ guide: { sections: [
+    { title: '🔥 Fire Starting', content: 'Fire provides warmth, water purification, cooking, signaling, and psychological comfort. Always build in a safe location away from dry vegetation.', tips: ['Collect tinder (dry leaves, bark shavings, grass) before striking', 'Use bow-drill with dry hardwood if no lighter available', 'Keep fire small and controllable in wind', 'Never leave fire unattended'] },
+    { title: '💧 Finding & Purifying Water', content: 'You can survive 3 weeks without food but only 3 days without water. Always purify water before drinking in the wild.', tips: ['Follow animal trails downhill — they usually lead to water', 'Boil water at least 1 minute (3 min at altitude)', 'Collect morning dew from large leaves with cloth', 'Avoid stagnant water — moving water is safer', 'Coconut, bamboo internodes, and banana stem provide emergency hydration'] },
+    { title: '🏕️ Emergency Shelter', content: 'Shelter from wind, rain, and cold is your first priority. Hypothermia kills faster than hunger or thirst in most environments.', tips: ['Look for natural shelters first: caves, rock overhangs, dense canopy', 'Build a lean-to with large leaves, bamboo, or branches', 'Insulate the ground — you lose more heat downward', 'Doorway should face away from prevailing wind'] },
+    { title: '🌿 Edible Plants — Safety Rules', content: 'Never eat a plant you cannot positively identify. Use the Universal Edibility Test when unsure.', tips: ['Avoid plants with milky white sap, bitter almond smell, or 3-leaf shiny surface', 'Safe worldwide: dandelion, cattail, bamboo shoots (boiled), moringa, banana (all parts)', 'Always cook unknown plants — heat destroys many toxins', 'Test one small piece at a time, wait 8 hours before eating more'] },
+    { title: '🆘 Signaling for Help', content: 'Three of anything is the universal distress signal — three whistle blasts, three fires in triangle, three gunshots.', tips: ['Move to open high ground to stay visible', 'Signal mirror visible 10+ miles on sunny days', 'Spell SOS with rocks or logs in open ground', 'Stay near your original location — rescuers search there first'] },
+    { title: '🐍 Dangerous Animals', content: 'Most animals will not attack unless cornered or surprised. Make noise when moving through brush.', tips: ['Check shoes and sleeping area for snakes and scorpions', 'Never reach into dark holes or under rocks', 'Snake bite: immobilize limb, keep below heart level, get to hospital fast', 'Avoid bright clothing near bee/wasp nests'] },
+    { title: '🧭 Navigation Without GPS', content: 'The sun rises east and sets west everywhere on Earth. At noon, shadows point north (northern hemisphere) or south (southern hemisphere).', tips: ['Moss grows thickest on north-facing side of trees (northern hemisphere)', 'North Star (Polaris) always directly north at night', 'Follow water downstream — leads to settlements', 'Mark trees to avoid walking in circles'] },
+  ]}, is_emergency: false });
+});
+
 // ── POST /api/survival/guide ──────────────────────────────────
 router.post('/guide', optionalAuth, async (req, res, next) => {
   try {

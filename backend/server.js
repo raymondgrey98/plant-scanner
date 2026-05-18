@@ -30,6 +30,7 @@ const survivalRoutes     = require('./routes/survival');
 const mapRoutes          = require('./routes/map');
 const farmingRoutes      = require('./routes/farming');
 const landscapeRoutes    = require('./routes/landscape');
+const disastersRoutes    = require('./routes/disasters');
 
 const PORT = process.env.PORT || 3001;
 const app  = express();
@@ -78,7 +79,7 @@ const authLimit = rateLimit({
   skipSuccessfulRequests: true,
 });
 const scanLimit = rateLimit({
-  windowMs: 60 * 1000, max: 15,
+  windowMs: 60 * 1000, max: 60,
   message: { error: 'Too many scans. Try again in a minute.' },
 });
 const chatLimit = rateLimit({
@@ -114,6 +115,7 @@ app.use('/api/survival',     scanLimit,  survivalRoutes);
 app.use('/api/map',                      mapRoutes);
 app.use('/api/farming',                  farmingRoutes);
 app.use('/api/landscape',    scanLimit,  landscapeRoutes);
+app.use('/api/disasters',                disastersRoutes);
 
 // ── Health + status ───────────────────────────────────────────
 app.get('/api/status', (_req, res) => {

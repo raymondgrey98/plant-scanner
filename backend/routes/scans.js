@@ -46,6 +46,7 @@ async function fetchExamplePhoto(name) {
 
 // ── Process a scan (shared logic) ────────────────────────────
 async function processScan(file, mode, userId) {
+  try {
   const [analysis, location] = await Promise.all([
     analyzeImage(file.path, mode),
     extractLocation(file.path),
@@ -53,7 +54,6 @@ async function processScan(file, mode, userId) {
 
   // Upload to Cloudinary if configured, then clean local file
   const cloudUrl = await uploadImage(file.path, 'floraiq/scans');
-  if (cloudUrl) deleteLocalFile(file.path);
 
   const searchName = analysis.common_name || analysis.plant_name;
   const example_photo = searchName ? await fetchExamplePhoto(searchName).catch(() => null) : null;
@@ -120,6 +120,10 @@ async function processScan(file, mode, userId) {
     result: analysis, example_photo,
     location: location || null,
   };
+  } finally {
+    // Security Fix: Always cleanup local storage regardless of success/failure
+    if (fs.existsSync(file.path)) deleteLocalFile(file.path);
+  }
 }
 
 // ── POST /api/scans/public (no auth) ──────────────────────────
@@ -151,12 +155,13 @@ router.get('/public', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// ── POST /api/scans (auth required) ──────────────────────────
-router.post('/', requireAuth, upload.single('photo'), async (req, res, next) => {
+// ── POST /api/scans (guest-friendly — accepts field name photo OR image) ──
+router.post('/', optionalAuth, upload.fields([{ name: 'photo', maxCount: 1 }, { name: 'image', maxCount: 1 }]), async (req, res, next) => {
   try {
-    if (!req.file) return res.status(400).json({ error: 'Photo is required' });
+    const file = req.files?.photo?.[0] || req.files?.image?.[0];
+    if (!file) return res.status(400).json({ error: 'Photo is required' });
     const mode   = (req.body.mode || 'default').trim();
-    const result = await processScan(req.file, mode, req.user.id);
+    const result = await processScan(file, mode, req.user?.id || null);
     res.json(result);
   } catch (err) { next(err); }
 });
@@ -166,14 +171,13 @@ router.post('/bulk', requireAuth, upload.array('photos', 20), async (req, res, n
   try {
     if (!req.files?.length) return res.status(400).json({ error: 'At least one photo is required' });
     const mode  = (req.body.mode || 'default').trim();
-    const items = [];
-    for (const file of req.files) {
-      try {
-        items.push(await processScan(file, mode, req.user.id));
-      } catch (err) {
-        items.push({ filename: file.filename, error: err.message });
-      }
-    }
+
+    const scanPromises = req.files.map(file => 
+      processScan(file, mode, req.user.id)
+        .catch(err => ({ filename: file.filename, error: err.message }))
+    );
+
+    const items = await Promise.all(scanPromises);
     res.json({ items });
   } catch (err) { next(err); }
 });
@@ -210,6 +214,40 @@ router.get('/', requireAuth, async (req, res, next) => {
       total: Number(total.rows[0].total),
       pages: Math.ceil(Number(total.rows[0].total) / limit),
     });
+  } catch (err) { next(err); }
+});
+
+// ── GET /api/scans/:id/deploy (Maker Mode Python Script) ──────
+router.get('/:id/deploy', requireAuth, async (req, res, next) => {
+  try {
+    const result = await query('SELECT result_json FROM scans WHERE id=$1 AND user_id=$2', [req.params.id, req.user.id]);
+    if (!result.rows.length) return res.status(404).json({ error: 'Scan not found' });
+    
+    const idea = result.rows[0].result_json.maker_project_idea;
+    if (!idea) return res.status(400).json({ error: 'No maker project logic found for this scan' });
+
+    const pythonScript = `
+# FloraIQ Autonomous Maker Project: ${idea.title}
+# Generated for Raspberry Pi 5 / Arduino
+# Agentic AI Logic: ${idea.agentic_logic}
+
+import time
+
+# Hardware Setup (Bill of Materials):
+${idea.bill_of_materials.map(m => `# - ${m.item}: ${m.purpose}`).join('\n')}
+
+def run_autonomous_loop():
+    print("Starting ${idea.title} autonomous system...")
+    # AI Logic Sketch:
+    # ${idea.logic_sketch.replace(/\n/g, '\n    # ')}
+    pass
+
+if __name__ == "__main__":
+    run_autonomous_loop()
+`;
+    res.setHeader('Content-Type', 'text/x-python');
+    res.setHeader('Content-Disposition', `attachment; filename=project_${req.params.id}.py`);
+    res.send(pythonScript);
   } catch (err) { next(err); }
 });
 

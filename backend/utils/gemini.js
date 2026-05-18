@@ -33,12 +33,16 @@ const MODE_HINTS = {
   toxic:    'Focus on identifying toxic plant, mushroom, or organism. CRITICAL: specify toxic compounds with names, affected organ systems, lethal dose if known, symptom timeline, and emergency first-aid guidance.',
   diagnose: 'Focus on plant disease diagnosis — identify the causal pathogen (kingdom, genus species), infection mechanism, symptom progression, conducive environmental conditions, and full integrated management protocol.',
   spider:   'Focus on spider identification, venom classification, web type, danger level to humans, and first-aid for bites.',
+  maker:    'MAKER MODE: You are an Agentic AI Engineer. Analyze the biological organism and suggest a DIY electronics project (Raspberry Pi/Arduino). Include sensor requirements, autonomous logic (like AG2), and a futuristic simulation description.',
+  field_analysis: 'SATELLITE/FIELD MODE: Simulate satellite data analysis for this area. Provide a synthetic NDVI health index (0.0-1.0), soil moisture estimation, nitrogen levels, and a 30-day yield forecast based on the crop’s current growth stage.',
   survival: 'SURVIVAL MODE: You are helping a hiker/camper in a remote environment. For EVERY organism identify: 1) Is it edible? How to prepare it safely? 2) Is it dangerous/toxic? What are symptoms? 3) What is the immediate danger level (0-10)? 4) Any medicinal uses? 5) Can it be used as a survival resource (fire, shelter, water collection)? Prioritise life-safety information above all else.',
   default:  'Identify whatever organism is in the photo — plant, insect, bird, mushroom, weed, or other. Provide full scientific detail appropriate to the organism type.',
 };
 
 function buildPrompt(mode) {
-  const hint = MODE_HINTS[mode] || MODE_HINTS.default;
+  const validatedMode = MODE_HINTS.hasOwnProperty(mode) ? mode : 'default';
+  const hint = MODE_HINTS[validatedMode];
+  
   return `You are FloraIQ's universal biological identification engine — an expert combining botany, entomology, ornithology, mycology, plant pathology, and ecology. Analyze the uploaded photo and identify the primary organism with full scientific rigor.
 
 ${hint}
@@ -52,6 +56,16 @@ Reply ONLY with a valid JSON object. Fill all fields relevant to the organism ty
   "taxonomy": { "kingdom": "", "phylum": "", "class": "", "order": "", "family": "", "genus": "", "species": "" },
   "description": "Comprehensive scientific description",
   "morphology": {},
+  "anatomy": [
+    {
+      "part_name": "Scientific name of part (e.g., Anther, Mycelium, Thorax)",
+      "description": "Micro-level function of this part",
+      "coordinates_hint": "Visual location description (e.g., center-left, base)",
+      "edibility_status": "Specific edibility of THIS part",
+      "botany_term": "Advanced botanical/mycological terminology",
+      "survival_value": "High/Medium/Low"
+    }
+  ],
   "habitat": "Preferred natural habitat",
   "distribution": "Native range and global distribution",
   "ecology": "Ecological role and key interactions",
@@ -82,7 +96,31 @@ Reply ONLY with a valid JSON object. Fill all fields relevant to the organism ty
   "hydroponics_suitable": true,
   "hydroponics_notes": "Notes on growing hydroponically — null if not applicable",
   "companion_plants": "Good companion plants (for cultivated species) — null otherwise",
-  "harvest_time_days": null
+  "harvest_time_days": null,
+  "pollinator_probability": {
+    "likely_pollinators": ["Bees", "Hummingbirds"],
+    "visual_cues": "Flower shape and UV-reflective patterns",
+    "attraction_score": 0.95
+  },
+  "genetic_proximity_hint": "Relationship to common crops or wild relatives (e.g., 85% match to Solanum family)",
+  "visual_soil_analysis": {
+    "estimated_ph": "6.5-7.0",
+    "texture": "sandy/loamy/clay",
+    "moisture_visual": "dry/saturated",
+    "nutrient_deficiency_clues": "Iron chlorosis visible in soil edge"
+  },
+  "field_insights": {
+    "ndvi_index": 0.75,
+    "estimated_yield_kg_per_ha": 0,
+    "soil_moisture_pct": 0,
+    "satellite_anomalies": "e.g., patchy nitrogen uptake",
+    "risk_assessment": "Low/Medium/High"
+  },
+  "maker_project_idea": { 
+    "title": "Project Name", 
+    "bill_of_materials": [{ "item": "Sensor/Part Name", "purpose": "Function in project" }], 
+    "logic_sketch": "Pseudocode or high-level autonomous logic flow (e.g. AG2 agent behaviors)", 
+  }
 }
 
 IMPORTANT: The morphology value must be a JSON object with organism-appropriate keys. Omit keys that don't apply.`;
@@ -92,7 +130,7 @@ IMPORTANT: The morphology value must be a JSON object with organism-appropriate 
 
 async function tryGemini(base64, mimeType, prompt) {
   if (!GEMINI_API_KEY) return null;
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
   const body  = {
     contents: [{ parts: [
@@ -104,7 +142,12 @@ async function tryGemini(base64, mimeType, prompt) {
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!res.ok) { const t = await res.text(); throw new Error(`Gemini ${res.status}: ${t.slice(0,200)}`); }
   const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+  // gemini-2.5-flash thinking model returns thought in parts[0], actual response in later parts
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  for (const part of parts) {
+    if (part.text && !part.thought) return part.text;
+  }
+  return parts[0]?.text || null;
 }
 
 async function tryOpenAI(base64, mimeType, prompt) {
@@ -151,7 +194,7 @@ async function tryClaude(base64, mimeType, prompt) {
 
 async function tryOpenRouter(base64, mimeType, prompt) {
   if (!OPENROUTER_KEY) return null;
-  const model = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free';
+  const model = process.env.OPENROUTER_MODEL || 'nvidia/nemotron-nano-12b-v2-vl:free';
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: { Authorization: `Bearer ${OPENROUTER_KEY}`, 'Content-Type': 'application/json' },
@@ -171,7 +214,7 @@ async function tryOpenRouter(base64, mimeType, prompt) {
 // ── Text-only providers (for chat) ────────────────────────────
 async function tryGeminiText(messages) {
   if (!GEMINI_API_KEY) return null;
-  const model = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
   const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
   const contents = messages.map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] }));
   const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents }) });
@@ -195,15 +238,26 @@ async function tryOpenAIText(messages) {
 
 async function tryOpenRouterText(messages) {
   if (!OPENROUTER_KEY) return null;
-  const model = process.env.OPENROUTER_TEXT_MODEL || 'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free';
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${OPENROUTER_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, messages }),
-  });
-  if (!res.ok) throw new Error(`OpenRouter text ${res.status}`);
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || null;
+  const models = [
+    process.env.OPENROUTER_TEXT_MODEL || 'google/gemma-4-31b-it:free',
+    'deepseek/deepseek-v4-flash:free',
+    'qwen/qwen3-coder:free',
+  ];
+  for (const model of models) {
+    try {
+      const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${OPENROUTER_KEY}`, 'Content-Type': 'application/json', 'HTTP-Referer': 'https://floraiq.app', 'X-Title': 'FloraIQ' },
+        body: JSON.stringify({ model, messages }),
+      });
+      if (res.status === 429) { console.warn(`[ai] OpenRouter text rate limited on ${model}`); continue; }
+      if (!res.ok) { console.warn(`[ai] OpenRouter text ${model} returned ${res.status}`); continue; }
+      const data = await res.json();
+      const text = data.choices?.[0]?.message?.content || null;
+      if (text) return text;
+    } catch (e) { console.warn(`[ai] OpenRouter text ${model} error: ${e.message}`); }
+  }
+  return null;
 }
 
 // ── Chain runner ──────────────────────────────────────────────
@@ -298,6 +352,12 @@ function parseResult(text) {
     hydroponics_notes:   parsed.hydroponics_notes    ?? null,
     companion_plants:    parsed.companion_plants     ?? null,
     harvest_time_days:   parsed.harvest_time_days    ?? null,
+    anatomy:             parsed.anatomy              ?? [],
+    pollinator_probability: parsed.pollinator_probability ?? null,
+    genetic_proximity_hint: parsed.genetic_proximity_hint ?? null,
+    visual_soil_analysis:   parsed.visual_soil_analysis   ?? null,
+    field_insights:         parsed.field_insights         ?? null,
+    maker_project_idea:     parsed.maker_project_idea     ?? null,
   };
 }
 
@@ -317,11 +377,139 @@ async function analyzeSurvival(filePath) {
   return analyzeImage(filePath, 'survival');
 }
 
+// FloraIQ Platform Knowledge Base — the chatbot knows about ALL features
+const FLORAIQ_FEATURES = `
+FloraIQ Platform Capabilities (v2026.4):
+
+🌿 AI & MACHINE LEARNING:
+- Plant/Insect/Bird/Mushroom identification with multi-model AI (Gemini, GPT-4o, Claude)
+- Disease diagnosis and treatment recommendations
+- Growth tracking with photo comparison over time
+- Yield estimation based on plant health analysis
+- Pest identification and integrated management plans
+- Soil analysis from photos (pH, texture, nutrients)
+- Weather-adaptive care recommendations
+- Plant compatibility and companion planting suggestions
+- Invasive species detection and alerts
+- Pollinator attraction scoring
+- Carbon sequestration calculations
+
+📱 MOBILE & PWA:
+- Offline mode with cached AI models
+- GPS location tagging for scans
+- AR plant information overlay
+- Voice commands ("Hey Flora, identify this plant")
+- Barcode scanner for nursery tags
+- Push notifications for watering/fertilizing
+- Photo geotagging from EXIF data
+- Batch upload for multiple plants
+- Camera filters for enhanced analysis
+
+🗺️ MAPPING & GEOLOCATION:
+- Interactive global species map
+- Invasive species heatmap tracking
+- Community garden locator
+- Climate zone overlays (USDA hardiness)
+- Soil type regional maps
+- Wildlife corridor mapping
+- Disaster risk zones (flood/fire/drought)
+
+👥 SOCIAL & COMMUNITY:
+- Plant parent profiles and collections
+- Achievement badges (Master Gardener, Compost King, etc.)
+- Plant trading marketplace
+- Expert Q&A forums
+- Community challenges and contests
+- Seed library and sharing network
+- Garden journal publishing
+- Mentorship programs
+
+🏢 COMMERCIAL & PROFESSIONAL:
+- Farm management dashboards
+- Inventory and supply tracking
+- Harvest scheduling optimization
+- Organic certification documentation
+- Labor time tracking
+- Profit margin calculators
+- Wholesale integration
+- Insurance documentation tools
+
+🔬 SCIENTIFIC & RESEARCH:
+- Citizen science data contribution
+- Biodiversity index calculations
+- Phenology tracking (flowering/fruiting times)
+- Climate change impact studies
+- Pollution bioindicators
+- Traditional knowledge archives
+- Academic paper integration
+
+🎮 GAMIFICATION & EDUCATION:
+- Plant identification quizzes
+- Virtual garden builder (3D)
+- Educational courses in botany/horticulture
+- Scavenger hunts for specific plants
+- Medicinal plant database
+- Cooking recipes from identified plants
+- Children's educational mode
+
+🏠 SMART HOME & IoT:
+- Smart irrigation integration (Rachio, RainMachine)
+- Soil moisture sensor synchronization
+- Weather station integration
+- Automated fertilizer dispensers
+- Grow light controllers
+- Greenhouse climate control
+- Robot gardener integration (FarmBot)
+
+📊 DATA & ANALYTICS:
+- Personal plant database export
+- Trend analysis and skill improvement tracking
+- Cost-benefit analysis for homegrown produce
+- Environmental impact reports
+- Predictive analytics for pest/disease outbreaks
+- Seasonal planning tools
+- Market price tracking
+
+🌍 SUSTAINABILITY:
+- Seed saving guides for heirloom varieties
+- Native plant restoration projects
+- Carbon offset calculations
+- Water conservation recommendations
+- Pollinator garden certification
+- Composting optimization
+- Food forest and permaculture design
+
+🚀 ADVANCED TECH:
+- Satellite imagery analysis for large-scale monitoring
+- Drone survey integration
+- Blockchain provenance for plant origins
+- AI-powered pruning advice
+- Automated weed detection
+- Hyperspectral imaging for nutrient deficiencies
+- Vertical farm optimization
+- Aquaponics system monitoring
+`;
+
 async function chatWithPlantExpert(question, context = '', language = 'en') {
   const langNote = language !== 'en' ? `\nIMPORTANT: Reply in ${getLanguageName(language)}.` : '';
   const messages = [{
     role: 'user',
-    content: `You are FloraIQ's biological intelligence system — a senior botanist, plant pathologist, entomologist, ornithologist, agricultural scientist, and wilderness survival expert. Provide scientifically accurate, detailed answers with proper terminology. Reference peer-reviewed findings where relevant. Use specific values (pH ranges, temperatures in °C, NPK ratios, concentrations, taxonomic names) rather than vague recommendations. Answer questions about plants, insects, birds, mushrooms, fungi, ecology, agricultural science, survival, and hydroponics.${context ? '\n\nContext: ' + context : ''}${langNote}\n\nQuestion: ${question}`,
+    content: `You are FloraIQ's AI biological intelligence system — a senior botanist, plant pathologist, entomologist, ornithologist, agricultural scientist, wilderness survival expert, AND a knowledgeable guide to all FloraIQ platform features.
+
+YOUR EXPERTISE:
+- Provide scientifically accurate, detailed answers with proper terminology
+- Reference peer-reviewed findings where relevant
+- Use specific values (pH ranges, temperatures in °C, NPK ratios, concentrations, taxonomic names)
+- Answer questions about plants, insects, birds, mushrooms, fungi, ecology, agricultural science, survival, and hydroponics
+
+FLORAIQ PLATFORM KNOWLEDGE:
+${FLORAIQ_FEATURES}
+
+When users ask about features, capabilities, or "what can FloraIQ do", explain the relevant features from the list above in a helpful, enthusiastic way. Always connect feature questions back to how they help the user's gardening/farming/survival goals.
+
+For plant science questions, provide deep technical answers. For feature questions, be promotional but honest about capabilities.
+
+${context ? '\n\nContext: ' + context : ''}${langNote}\n\nQuestion: ${question}`,
   }];
   return runTextChain(messages);
 }
@@ -419,4 +607,68 @@ function getLanguageName(code) {
   return names[code] || 'English';
 }
 
-module.exports = { analyzeImage, analyzePlant, analyzeSurvival, chatWithPlantExpert, getFarmingAdvice, getSurvivalGuide };
+/**
+ * AI Growth Comparison
+ * Compares a historical image with a new one to track biological progress.
+ */
+async function compareGrowth(oldImagePath, newImagePath, organismName) {
+  const oldBase64 = fs.readFileSync(oldImagePath).toString('base64');
+  const newBase64 = fs.readFileSync(newImagePath).toString('base64');
+  const mimeType = mimeFor(newImagePath);
+
+  const prompt = `You are a biological growth analyst. Compare these two photos of the same ${organismName || 'organism'}.
+  Photo 1 is the past state. Photo 2 is the current state.
+  Analyze changes in:
+  1. Biomass/Size (e.g., "Grown approx 5cm")
+  2. Health markers (e.g., "Yellowing has decreased by 20%")
+  3. New features (e.g., "3 new nodes visible", "flowering has begun")
+  4. Recommendations (e.g., "Increase nitrogen now")
+
+  Reply ONLY in JSON:
+  {
+    "growth_detected": true,
+    "delta_description": "summary of change",
+    "health_change": "improved/declined/stable",
+    "estimated_growth_rate": "percentage or cm",
+    "new_structures": ["list", "of", "parts"],
+    "alert": "any urgent care needs based on the change"
+  }`;
+
+  // Gemini 2.0 Flash supports multi-image prompts natively
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const body = {
+    contents: [{ parts: [
+      { text: prompt },
+      { inline_data: { mime_type: mimeType, data: oldBase64 } },
+      { inline_data: { mime_type: mimeType, data: newBase64 } },
+    ] }],
+    generationConfig: { temperature: 0.2, responseMimeType: "application/json" }
+  };
+
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`Gemini comparison ${res.status}: ${t.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    return JSON.parse(data.candidates?.[0]?.content?.parts?.[0]?.text || '{}');
+  } catch (err) {
+    console.error('[ai] compareGrowth failed:', err.message);
+    return {
+      growth_detected: false,
+      delta_description: 'Comparison failed',
+      health_change: 'unknown',
+      estimated_growth_rate: null,
+      new_structures: [],
+      alert: err.message
+    };
+  }
+}
+
+module.exports = { 
+  analyzeImage, analyzePlant, analyzeSurvival, 
+  chatWithPlantExpert, getFarmingAdvice, getSurvivalGuide,
+  compareGrowth 
+};

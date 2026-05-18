@@ -1,9 +1,9 @@
-// FloraIQ Service Worker v2.0
+// FloraIQ Service Worker v2.1
 // Caches static assets + plant library for offline use
 
-const CACHE_NAME = 'floraiq-v2';
-const STATIC_CACHE = 'floraiq-static-v2';
-const API_CACHE = 'floraiq-api-v2';
+const CACHE_NAME = 'floraiq-v2.1';
+const STATIC_CACHE = 'floraiq-static-v2.1';
+const API_CACHE = 'floraiq-api-v2.1';
 
 const STATIC_ASSETS = [
   '/',

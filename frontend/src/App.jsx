@@ -46,7 +46,7 @@ function AuthProvider({ children }) {
   }, []);
 
   const signup = useCallback(async (name, email, password) => {
-    const r = await fetch(`${API}/auth/register`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password }) });
+    const r = await fetch(`${API}/auth/signup`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password }) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'Signup failed');
     setUser(d.user);
@@ -484,30 +484,44 @@ function PlantCard({ plant, onFavorite }) {
 function ScanResult({ result, onSave }) {
   const [tab, setTab] = useState('overview');
   if (!result) return null;
-  const id = result.identification || result;
-  const survival = result.survival_assessment || {};
-  const loc = result.location || result.geo || {};
+
+  // Normalize: handle POST /api/scans response, GET /api/scans/:id, history rows, etc.
+  const a = result.result || result.result_json || result.identification?.result_json || result.identification || result;
+  const taxon   = a.taxonomy || {};
+  const danger  = a.danger_level ?? null;
+  const conf    = a.confidence != null ? (a.confidence > 1 ? Math.round(a.confidence) : Math.round(a.confidence * 100)) : null;
+  const loc     = result.location || {};
+  const imgSrc  = result.url || result.image_url || result.cloud_url || result.example_photo;
   const tabs = ['overview', 'survival', 'taxonomy', 'uses', 'location'];
 
   return (
     <Card className="overflow-hidden">
-      {result.image_url && <img src={result.image_url} alt={id.common_name} className="w-full h-48 object-cover" />}
+      {imgSrc && <img src={imgSrc} alt={a.common_name} className="w-full h-52 object-cover" />}
+      {result.example_photo && !imgSrc && <img src={result.example_photo} alt="Reference" className="w-full h-52 object-cover opacity-70" />}
       <div className="p-5">
-        <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex items-start justify-between gap-3 mb-1">
           <div>
-            <h3 className="text-lg font-bold text-zinc-100">{id.common_name || 'Unknown Organism'}</h3>
-            {id.scientific_name && <p className="text-xs italic text-zinc-500">{id.scientific_name}</p>}
+            <h3 className="text-xl font-extrabold text-white capitalize">{a.common_name || a.plant_name || 'Unknown Organism'}</h3>
+            {a.scientific_name && <p className="text-sm italic text-zinc-400">{a.scientific_name}</p>}
           </div>
-          <div className="flex flex-col items-end gap-1">
-            {id.confidence && <Badge color="green">{id.confidence}% match</Badge>}
-            {survival.danger_level && <DangerLevel level={survival.danger_level} />}
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {conf != null && <Badge color="green">{conf}% match</Badge>}
+            {danger != null && <DangerLevel level={danger} />}
           </div>
         </div>
+        {a.subject_type && <p className="text-xs text-zinc-500 mb-3 capitalize">{a.subject_type}</p>}
+
+        {a.safety_warning && (
+          <div className="mb-3 p-3 bg-red-950/60 border border-red-700/50 rounded-xl flex gap-2">
+            <span className="text-red-400 shrink-0">⚠️</span>
+            <p className="text-xs text-red-300 font-medium">{a.safety_warning}</p>
+          </div>
+        )}
 
         <div className="flex gap-1 mb-4 flex-wrap">
           {tabs.map(t => (
             <button key={t} onClick={() => setTab(t)}
-              className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-colors ${tab === t ? 'bg-green-500 text-black' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'}`}>
+              className={`px-3 py-1 rounded-lg text-xs font-medium capitalize transition-colors ${tab === t ? 'bg-green-500 text-black font-bold' : 'bg-zinc-800 text-zinc-400 hover:text-zinc-200'}`}>
               {t}
             </button>
           ))}
@@ -515,37 +529,89 @@ function ScanResult({ result, onSave }) {
 
         {tab === 'overview' && (
           <div className="space-y-3">
-            {id.description && <p className="text-sm text-zinc-300 leading-relaxed">{id.description}</p>}
-            {id.native_habitat && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Habitat</p><p className="text-sm text-zinc-300">{id.native_habitat}</p></div>}
-            {id.similar_species?.length > 0 && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Similar Species</p><ul className="space-y-1">{id.similar_species.map((s, i) => <li key={i} className="text-sm text-zinc-300">• {typeof s === 'object' ? s.name || JSON.stringify(s) : s}</li>)}</ul></div>}
+            {a.description && <p className="text-sm text-zinc-300 leading-relaxed">{a.description}</p>}
+            {(a.habitat || a.distribution) && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {a.habitat && <div className="bg-zinc-800/60 rounded-xl p-3"><p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Habitat</p><p className="text-sm text-zinc-300">{a.habitat}</p></div>}
+                {a.distribution && <div className="bg-zinc-800/60 rounded-xl p-3"><p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Distribution</p><p className="text-sm text-zinc-300">{a.distribution}</p></div>}
+              </div>
+            )}
+            {a.ecology && <div><p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Ecology</p><p className="text-sm text-zinc-300">{a.ecology}</p></div>}
+            {a.lookalikes && <div className="p-3 bg-amber-950/40 border border-amber-700/30 rounded-xl"><p className="text-xs font-bold text-amber-400 mb-1">⚠️ Lookalikes / Confusion Species</p><p className="text-sm text-zinc-300">{a.lookalikes}</p></div>}
+            {a.life_cycle && <div><p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Life Cycle</p><p className="text-sm text-zinc-300">{a.life_cycle}</p></div>}
+            {result.example_photo && (
+              <div className="pt-2">
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Reference Photo</p>
+                <img src={result.example_photo} alt="Reference" className="w-full max-h-40 object-contain rounded-xl border border-zinc-800" />
+              </div>
+            )}
           </div>
         )}
 
         {tab === 'survival' && (
           <div className="space-y-3">
-            {survival.danger_level && <div className="flex items-center gap-2"><span className="text-xs text-zinc-500">Danger:</span><DangerLevel level={survival.danger_level} /></div>}
-            {survival.edibility && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Edibility</p><p className="text-sm text-zinc-300">{survival.edibility}</p></div>}
-            {survival.toxicity && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Toxicity</p><p className="text-sm text-zinc-300">{survival.toxicity}</p></div>}
-            {survival.medicinal_uses && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Medicinal Uses</p><p className="text-sm text-zinc-300">{survival.medicinal_uses}</p></div>}
-            {survival.survival_tips?.length > 0 && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Survival Tips</p><ul className="space-y-1">{survival.survival_tips.map((s, i) => <li key={i} className="text-sm text-zinc-300 flex gap-2"><span className="text-green-500 shrink-0">•</span>{s}</li>)}</ul></div>}
-            {survival.emergency_actions && <div className="mt-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg"><p className="text-xs font-bold text-red-400 mb-1">Emergency Actions</p><p className="text-xs text-zinc-300">{survival.emergency_actions}</p></div>}
+            {danger != null && (
+              <div className="flex items-center gap-3 p-3 bg-zinc-800/60 rounded-xl">
+                <span className="text-xs text-zinc-400 shrink-0">Danger Level</span>
+                <DangerLevel level={danger} />
+                <span className="text-xs text-zinc-500">/ 10</span>
+              </div>
+            )}
+            {a.edibility && <div className="p-3 bg-green-950/40 border border-green-800/30 rounded-xl"><p className="text-xs font-bold text-green-400 mb-1">🍃 Edibility</p><p className="text-sm text-zinc-300">{a.edibility}</p></div>}
+            {a.toxicity && <div className="p-3 bg-red-950/40 border border-red-800/30 rounded-xl"><p className="text-xs font-bold text-red-400 mb-1">☠️ Toxicity</p><p className="text-sm text-zinc-300">{a.toxicity}</p></div>}
+            {a.survival_uses && <div><p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Survival Uses</p><p className="text-sm text-zinc-300">{a.survival_uses}</p></div>}
+            {a.ethnobotany && <div><p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Medicinal / Traditional Uses</p><p className="text-sm text-zinc-300">{a.ethnobotany}</p></div>}
+            {a.first_aid && <div className="p-3 bg-red-950/60 border border-red-600/40 rounded-xl"><p className="text-xs font-bold text-red-300 mb-1">🚑 Emergency First Aid</p><p className="text-sm text-zinc-300">{a.first_aid}</p></div>}
+            {!a.edibility && !a.toxicity && !a.survival_uses && <p className="text-sm text-zinc-500">No survival data available for this organism.</p>}
+            {/* YouTube link */}
+            {(a.common_name || a.plant_name) && (
+              <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent((a.common_name || a.plant_name) + ' edible wild survival foraging')}`}
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-2 mt-2 px-4 py-2.5 bg-red-700 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition">
+                ▶️ YouTube — Survival & Foraging Videos
+              </a>
+            )}
           </div>
         )}
 
         {tab === 'taxonomy' && (
           <div className="grid grid-cols-2 gap-3 text-sm">
             {['kingdom','phylum','class','order','family','genus','species'].map(k => (
-              id[k] && <div key={k}><p className="text-xs text-zinc-500 capitalize">{k}</p><p className="text-zinc-200 font-medium">{id[k]}</p></div>
+              (taxon[k] || a[k]) && (
+                <div key={k} className="bg-zinc-800/60 rounded-xl p-3">
+                  <p className="text-xs text-zinc-500 capitalize">{k}</p>
+                  <p className="text-zinc-200 font-medium">{taxon[k] || a[k]}</p>
+                </div>
+              )
             ))}
+            {a.genetic_proximity_hint && (
+              <div className="col-span-2 bg-zinc-800/60 rounded-xl p-3">
+                <p className="text-xs text-zinc-500">Genetic Proximity</p>
+                <p className="text-zinc-200 text-sm">{a.genetic_proximity_hint}</p>
+              </div>
+            )}
           </div>
         )}
 
         {tab === 'uses' && (
           <div className="space-y-3">
-            {id.culinary_uses && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Culinary</p><p className="text-sm text-zinc-300">{id.culinary_uses}</p></div>}
-            {id.medicinal_uses && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Medicinal</p><p className="text-sm text-zinc-300">{id.medicinal_uses}</p></div>}
-            {id.cultural_significance && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Cultural</p><p className="text-sm text-zinc-300">{id.cultural_significance}</p></div>}
-            {id.conservation_status && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Conservation</p><Badge color={id.conservation_status.includes('Least') ? 'green' : 'amber'}>{id.conservation_status}</Badge></div>}
+            {a.edibility && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Edibility / Culinary</p><p className="text-sm text-zinc-300">{a.edibility}</p></div>}
+            {a.ethnobotany && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Medicinal / Ethnobotany</p><p className="text-sm text-zinc-300">{a.ethnobotany}</p></div>}
+            {a.economic_importance && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Economic Importance</p><p className="text-sm text-zinc-300">{a.economic_importance}</p></div>}
+            {a.care_summary && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Cultivation Guide</p><p className="text-sm text-zinc-300">{a.care_summary}</p></div>}
+            {a.conservation_status && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Conservation</p><Badge color={a.conservation_status.includes('Least') ? 'green' : 'amber'}>{a.conservation_status}</Badge></div>}
+            {a.research_notes && <div><p className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-1">Research Notes</p><p className="text-sm text-zinc-400">{a.research_notes}</p></div>}
+            {/* External links */}
+            {a.scientific_name && (
+              <div className="pt-2 space-y-2">
+                <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide">External Databases</p>
+                <a href={`https://www.inaturalist.org/search?q=${encodeURIComponent(a.scientific_name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition">🌍 iNaturalist</a>
+                <a href={`https://www.gbif.org/species/search?q=${encodeURIComponent(a.scientific_name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white text-xs font-semibold rounded-xl transition">🔬 GBIF Database</a>
+                {a.subject_type?.includes('plant') || a.subject_type?.includes('tree') || a.subject_type?.includes('herb') ? (
+                  <a href={`https://www.worldfloraonline.org/search?query=${encodeURIComponent(a.scientific_name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-green-900 hover:bg-green-800 text-white text-xs font-semibold rounded-xl transition">🌺 World Flora Online</a>
+                ) : null}
+              </div>
+            )}
           </div>
         )}
 
@@ -553,13 +619,16 @@ function ScanResult({ result, onSave }) {
           <div className="space-y-3 text-sm">
             {loc.country || loc.city ? (
               <>
-                {loc.country && <div><p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Country</p><p className="text-zinc-200">🌍 {loc.country}</p></div>}
-                {loc.city && <div><p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">City</p><p className="text-zinc-200">🏙️ {loc.city}</p></div>}
+                {loc.country && <div className="bg-zinc-800/60 rounded-xl p-3"><p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Country</p><p className="text-zinc-200">🌍 {loc.country}</p></div>}
+                {loc.city && <div className="bg-zinc-800/60 rounded-xl p-3"><p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">City</p><p className="text-zinc-200">🏙️ {loc.city}</p></div>}
                 {loc.street && <div><p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Street</p><p className="text-zinc-200">📍 {loc.street}</p></div>}
-                {loc.latitude && <div><p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">Coordinates</p><p className="text-zinc-200 font-mono text-xs">{loc.latitude.toFixed(5)}, {loc.longitude.toFixed(5)}</p></div>}
+                {loc.latitude && <div className="bg-zinc-800/60 rounded-xl p-3"><p className="text-xs text-zinc-500 uppercase tracking-wide mb-0.5">GPS Coordinates</p><p className="text-zinc-200 font-mono text-xs">{loc.latitude?.toFixed(5)}, {loc.longitude?.toFixed(5)}</p></div>}
               </>
             ) : (
-              <p className="text-zinc-500 text-xs">No location data in photo. Take photos with GPS enabled for location tracking.</p>
+              <div className="text-center py-6">
+                <p className="text-zinc-500 text-sm">No GPS data in this photo.</p>
+                <p className="text-zinc-600 text-xs mt-1">Enable location on your camera and retake for automatic geo-tagging.</p>
+              </div>
             )}
           </div>
         )}
@@ -596,14 +665,17 @@ function SearchResults({ query }) {
           </div>
         </div>
       )}
-      {results.gbif?.length > 0 && (
+      {results.gbif?.filter(g => g.rank === 'SPECIES' || g.rank === 'SUBSPECIES').length > 0 && (
         <div>
-          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">GBIF Species ({results.gbif.length})</p>
+          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wide mb-2">GBIF Species</p>
           <div className="space-y-2">
-            {results.gbif.map((g, i) => (
+            {results.gbif.filter(g => g.rank === 'SPECIES' || g.rank === 'SUBSPECIES').slice(0, 8).map((g, i) => (
               <Card key={i} className="p-3 flex items-center justify-between">
-                <div><p className="text-sm font-medium text-zinc-200">{g.canonicalName}</p><p className="text-xs text-zinc-500">{g.family}</p></div>
-                <Badge color="blue">{g.rank}</Badge>
+                <div>
+                  <p className="text-sm font-medium text-zinc-200">{g.canonicalName}</p>
+                  <p className="text-xs text-zinc-500">{g.family} · {g.kingdom}</p>
+                </div>
+                <a href={`https://www.gbif.org/species/${g.key}`} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300">GBIF ↗</a>
               </Card>
             ))}
           </div>
@@ -743,7 +815,7 @@ function ScanPage({ onNav }) {
     if (!file) return;
     setLoading(true); setError(''); setResult(null); setAiModel('');
     const fd = new FormData();
-    fd.append('image', file);
+    fd.append('photo', file);
     fd.append('mode', mode);
     try {
       const r = await fetch(`${API}/scans`, { method: 'POST', credentials: 'include', body: fd });
@@ -914,36 +986,153 @@ function HistoryPage() {
 }
 
 // ── Library Page ──────────────────────────────────────────────
-function LibraryPage() {
-  const [organisms, setOrganisms] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
-  const [searched, setSearched] = useState(false);
+const LIB_CATS = [
+  { id: 'Plantae',        label: 'Plants',    icon: '🌿', color: '#22c55e', desc: 'Flowers, trees, herbs, crops' },
+  { id: 'Insecta',        label: 'Insects',   icon: '🐛', color: '#f59e0b', desc: 'Beetles, butterflies, ants' },
+  { id: 'Aves',           label: 'Birds',     icon: '🐦', color: '#3b82f6', desc: 'All bird species worldwide' },
+  { id: 'Fungi',          label: 'Mushrooms', icon: '🍄', color: '#8b5cf6', desc: 'Edible, toxic, medicinal fungi' },
+  { id: 'Reptilia',       label: 'Reptiles',  icon: '🦎', color: '#ef4444', desc: 'Snakes, lizards, turtles' },
+  { id: 'Actinopterygii', label: 'Marine',    icon: '🐠', color: '#06b6d4', desc: 'Fish, coral, ocean life' },
+  { id: 'Mammalia',       label: 'Mammals',   icon: '🐆', color: '#f97316', desc: 'Wild mammals and predators' },
+  { id: 'Arachnida',      label: 'Spiders',   icon: '🕷️', color: '#a78bfa', desc: 'Spiders, scorpions, mites' },
+];
 
-  useEffect(() => {
-    fetch(`${API}/plants?limit=60`).then(r => r.json()).then(d => setOrganisms(Array.isArray(d) ? d : d.plants || [])).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+const STATUS_COLORS = { LC: '#22c55e', NT: '#84cc16', VU: '#f59e0b', EN: '#f97316', CR: '#ef4444', EW: '#dc2626', EX: '#7f1d1d' };
 
-  const search = e => { e.preventDefault(); setSearched(true); };
+function SpeciesModal({ sp, onClose }) {
+  const inatUrl = `https://www.inaturalist.org/taxa/${sp.id}`;
+  const wikiUrl = sp.wikipedia_url;
+  const status = sp.conservation_status?.status?.toUpperCase() || 'LC';
+  const statusColor = STATUS_COLORS[status] || '#6b7280';
+  const img = sp.default_photo?.medium_url;
+  const obs = sp.observations_count ? sp.observations_count.toLocaleString() : '—';
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8 pb-28">
-      <h1 className="text-2xl font-extrabold text-white mb-6">Species Library</h1>
-      <form onSubmit={search} className="flex gap-2 mb-6">
-        <Input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search plants, insects, birds, fungi…" className="flex-1" />
-        <Btn type="submit">Search</Btn>
-      </form>
-      {searched && query ? (
-        <SearchResults query={query} />
-      ) : (
-        loading ? (
-          <div className="py-8 text-center"><div className="w-6 h-6 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto" /></div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {organisms.map((o, i) => <PlantCard key={i} plant={o} />)}
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="relative bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        {img && <img src={img} alt={sp.name} className="w-full h-52 object-cover rounded-t-2xl" />}
+        <div className="p-5 space-y-3">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h2 className="text-xl font-extrabold text-white capitalize">{sp.preferred_common_name || sp.name}</h2>
+              <p className="text-sm italic text-zinc-400">{sp.name}</p>
+            </div>
+            <span className="text-xs font-bold px-2 py-1 rounded-full shrink-0" style={{ background: statusColor + '22', color: statusColor, border: `1px solid ${statusColor}55` }}>{status}</span>
           </div>
-        )
+          <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400">
+            <div className="bg-zinc-800 rounded-lg p-2"><span className="text-zinc-500">Observations</span><p className="font-bold text-white">{obs}</p></div>
+            <div className="bg-zinc-800 rounded-lg p-2"><span className="text-zinc-500">Rank</span><p className="font-bold text-white capitalize">{sp.rank || 'species'}</p></div>
+          </div>
+          {sp.wikipedia_summary && <p className="text-sm text-zinc-400 leading-relaxed">{sp.wikipedia_summary}</p>}
+          <div className="flex flex-col gap-2 pt-1">
+            {wikiUrl && <a href={wikiUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition">📖 Wikipedia — Full Species Article</a>}
+            <a href={inatUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition">🌍 iNaturalist — Global Sightings & Photos</a>
+            <a href={`https://www.gbif.org/species/search?q=${encodeURIComponent(sp.name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-semibold rounded-xl transition">🔬 GBIF — Scientific Occurrence Data</a>
+            {sp.iconic_taxon_name === 'Plantae' && <a href={`https://www.worldfloraonline.org/search?query=${encodeURIComponent(sp.name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-green-900 hover:bg-green-800 text-white text-sm font-semibold rounded-xl transition">🌺 World Flora Online</a>}
+            <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent((sp.preferred_common_name || sp.name) + ' identification foraging survival')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition">▶️ YouTube — Identification & Survival Videos</a>
+          </div>
+          <button onClick={onClose} className="w-full mt-2 py-2 text-sm text-zinc-500 hover:text-zinc-300 transition">Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LibraryPage() {
+  const [category, setCategory] = useState('Plantae');
+  const [species, setSpecies] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const catInfo = LIB_CATS.find(c => c.id === category) || LIB_CATS[0];
+
+  const loadCategory = async (cat) => {
+    setCategory(cat); setIsSearchMode(false); setQuery(''); setLoading(true); setSpecies([]);
+    try {
+      const r = await fetch(`https://api.inaturalist.org/v1/taxa?iconic_taxa=${cat}&rank=species&per_page=48&order_by=observations_count&order=desc&photos=true`);
+      const d = await r.json();
+      setSpecies((d.results || []).filter(s => s.default_photo?.medium_url));
+    } catch {} finally { setLoading(false); }
+  };
+
+  const search = async e => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    setSearching(true); setIsSearchMode(true); setSpecies([]);
+    try {
+      const r = await fetch(`https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(query)}&rank=species&per_page=48&photos=true&order_by=observations_count&order=desc`);
+      const d = await r.json();
+      setSpecies((d.results || []).filter(s => s.default_photo?.medium_url));
+    } catch {} finally { setSearching(false); }
+  };
+
+  useEffect(() => { loadCategory('Plantae'); }, []);
+
+  return (
+    <div className="max-w-6xl mx-auto px-4 py-8 pb-28">
+      <h1 className="text-2xl font-extrabold text-white mb-2">Species Library</h1>
+      <p className="text-sm text-zinc-500 mb-5">Browse {isSearchMode ? 'search results' : `top ${catInfo.label.toLowerCase()} species`} — click any for Wikipedia, iNaturalist & YouTube links</p>
+
+      {/* Category tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
+        {LIB_CATS.map(cat => (
+          <button key={cat.id} onClick={() => loadCategory(cat.id)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition border"
+            style={category === cat.id && !isSearchMode
+              ? { background: cat.color + '22', color: cat.color, borderColor: cat.color + '55' }
+              : { background: '#18181b', color: '#a1a1aa', borderColor: '#3f3f46' }}>
+            {cat.icon} {cat.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Search */}
+      <form onSubmit={search} className="flex gap-2 mb-6">
+        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search any species — grasshopper, moringa, king cobra…"
+          className="flex-1 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-green-500" />
+        <button type="submit" disabled={searching} className="px-5 py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-bold rounded-xl transition">
+          {searching ? '…' : 'Search'}
+        </button>
+        {isSearchMode && <button type="button" onClick={() => loadCategory(category)} className="px-3 py-2.5 bg-zinc-800 text-zinc-400 text-sm rounded-xl">✕</button>}
+      </form>
+
+      {/* Grid */}
+      {loading || searching ? (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          {Array.from({ length: 24 }).map((_, i) => (
+            <div key={i} className="aspect-square rounded-xl bg-zinc-800 animate-pulse" />
+          ))}
+        </div>
+      ) : species.length === 0 ? (
+        <div className="text-center py-16 text-zinc-500">No results found. Try a different search.</div>
+      ) : (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          {species.map(sp => {
+            const status = sp.conservation_status?.status?.toUpperCase();
+            const isDangerous = ['CR','EN','EX'].includes(status);
+            const isVulnerable = status === 'VU';
+            return (
+              <div key={sp.id} onClick={() => setSelected(sp)}
+                className="group relative cursor-pointer rounded-xl overflow-hidden border border-zinc-800 hover:border-zinc-600 transition aspect-square">
+                <img src={sp.default_photo?.square_url || sp.default_photo?.medium_url} alt={sp.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                {isDangerous && <span className="absolute top-1.5 right-1.5 text-xs bg-red-600 text-white px-1.5 py-0.5 rounded-full font-bold">☠️</span>}
+                {isVulnerable && <span className="absolute top-1.5 right-1.5 text-xs bg-orange-500 text-white px-1.5 py-0.5 rounded-full font-bold">⚠️</span>}
+                <div className="absolute bottom-0 left-0 right-0 p-2">
+                  <p className="text-white text-xs font-bold leading-tight capitalize truncate">{sp.preferred_common_name || sp.name}</p>
+                  <p className="text-zinc-400 text-[10px] italic truncate">{sp.name}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
+
+      {selected && <SpeciesModal sp={selected} onClose={() => setSelected(null)} />}
     </div>
   );
 }
@@ -1015,8 +1204,8 @@ function SurvivalPage({ onNav }) {
 
   const loadGuide = async () => {
     setGuideLoading(true);
-    const r = await fetch(`${API}/survival/guide`).catch(() => null);
-    if (r?.ok) setGuide(await r.json());
+    const r = await fetch(`${API}/survival/guide`, { method: 'GET' }).catch(() => null);
+    if (r?.ok) { const d = await r.json(); setGuide(d.guide || d); }
     setGuideLoading(false);
   };
 
@@ -1094,51 +1283,240 @@ function SurvivalPage({ onNav }) {
 }
 
 // ── Map Page ──────────────────────────────────────────────────
+const DISASTER_LAYERS = [
+  { id: 'quakes',   label: 'Earthquakes',   icon: '🔴', color: '#ef4444' },
+  { id: 'gdacs',    label: 'Floods/Storms',  icon: '🌊', color: '#3b82f6' },
+  { id: 'weather',  label: 'Weather Alerts', icon: '⛈️', color: '#f59e0b' },
+  { id: 'relief',   label: 'Active Disasters',icon: '🆘', color: '#a855f7' },
+];
+
+const GDACS_COLORS = { eq: '#ef4444', tc: '#8b5cf6', fl: '#3b82f6', dr: '#f59e0b', wf: '#f97316', vo: '#dc2626' };
+
 function MapPage() {
-  const mapRef = useRef(null);
-  const leafletMap = useRef(null);
-  const [sightings, setSightings] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
+  const mapRef      = useRef(null);
+  const leafletMap  = useRef(null);
+  const tileLayerRef = useRef(null);
+  const [sightings, setSightings]   = useState([]);
+  const [filter, setFilter]         = useState('all');
+  const [loading, setLoading]       = useState(true);
+  const [satellite, setSatellite]   = useState(false);
+  const [layers, setLayers]         = useState({ quakes: false, gdacs: false, weather: false, relief: false });
+  const [disasters, setDisasters]   = useState({ quakes: [], gdacs: [], weather: [], relief: [] });
+  const [loadingDis, setLoadingDis] = useState({});
+  const [disPanel, setDisPanel]     = useState(null);
 
   useEffect(() => {
     fetch(`${API}/map/sightings?limit=500`).then(r => r.json()).then(d => setSightings(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
+  const toggleLayer = async (id) => {
+    const next = !layers[id];
+    setLayers(l => ({ ...l, [id]: next }));
+    if (next && disasters[id].length === 0) {
+      setLoadingDis(l => ({ ...l, [id]: true }));
+      try {
+        let url = '';
+        if (id === 'quakes') url = 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4.5&limit=150&orderby=time';
+        if (id === 'gdacs')   url = `${API}/disasters/gdacs`;
+        if (id === 'weather') url = `${API}/disasters/weather-alerts`;
+        if (id === 'relief')  url = `${API}/disasters/reliefweb`;
+        const r = await fetch(url); const d = await r.json();
+        if (id === 'quakes') setDisasters(p => ({ ...p, quakes: d.features || [] }));
+        else setDisasters(p => ({ ...p, [id]: d }));
+      } catch {}
+      setLoadingDis(l => ({ ...l, [id]: false }));
+    }
+  };
+
   useEffect(() => {
-    if (!mapRef.current || typeof window.L === 'undefined') return;
-    if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; }
-    const map = window.L.map(mapRef.current, { center: [20, 0], zoom: 2, zoomControl: true });
-    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
-    const colorMap = { plant: '#22c55e', insect: '#f59e0b', bird: '#3b82f6', mushroom: '#8b5cf6', reptile: '#ef4444', marine: '#06b6d4', survival: '#f97316' };
-    const filtered = filter === 'all' ? sightings : sightings.filter(s => s.scan_mode === filter);
-    filtered.forEach(s => {
-      if (!s.latitude || !s.longitude) return;
-      const color = colorMap[s.scan_mode] || '#6b7280';
-      window.L.circleMarker([s.latitude, s.longitude], { radius: 6, fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.8 })
-        .addTo(map)
-        .bindPopup(`<b>${s.common_name || 'Unknown'}</b><br>${s.scientific_name || ''}<br><small>${s.country || ''}</small>`);
-    });
-    leafletMap.current = map;
+    if (!mapRef.current) return;
+    let timeout;
+    if (typeof window.L === 'undefined') {
+      timeout = setTimeout(initLeaflet, 800);
+      return () => clearTimeout(timeout);
+    }
+    initLeaflet();
+    function initLeaflet() {
+      if (!mapRef.current || typeof window.L === 'undefined') return;
+      if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; }
+      const map = window.L.map(mapRef.current, { center: [20, 0], zoom: 2, zoomControl: true });
+      const osmTile  = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      const esriTile = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+      const tileUrl  = satellite ? esriTile : osmTile;
+      const tileAttr = satellite ? 'Tiles © Esri — USGS, NOAA' : '© OpenStreetMap';
+      tileLayerRef.current = window.L.tileLayer(tileUrl, { attribution: tileAttr }).addTo(map);
+      const colorMap = { plant: '#22c55e', insect: '#f59e0b', bird: '#3b82f6', mushroom: '#8b5cf6', reptile: '#ef4444', marine: '#06b6d4', survival: '#f97316' };
+      const filtered = filter === 'all' ? sightings : sightings.filter(s => s.scan_mode === filter);
+      filtered.forEach(s => {
+        if (!s.latitude || !s.longitude) return;
+        const color = colorMap[s.scan_mode] || '#6b7280';
+        window.L.circleMarker([s.latitude, s.longitude], { radius: 6, fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.85 })
+          .addTo(map)
+          .bindPopup(`<b>${s.common_name || 'Unknown'}</b><br><i>${s.scientific_name || ''}</i><br><small>${s.country || ''}</small>`);
+      });
+
+      // Earthquake overlay
+      if (layers.quakes) {
+        disasters.quakes.forEach(eq => {
+          const [lng, lat] = eq.geometry.coordinates;
+          const mag = eq.properties.mag || 5;
+          const color = mag >= 7 ? '#7f1d1d' : mag >= 6 ? '#ef4444' : '#f87171';
+          window.L.circleMarker([lat, lng], { radius: Math.max(5, mag * 3), fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.8 })
+            .addTo(map)
+            .bindPopup(`<b>🔴 M${mag} Earthquake</b><br>${eq.properties.place}<br><small>${new Date(eq.properties.time).toLocaleString()}</small>`);
+        });
+      }
+
+      // GDACS overlay (floods, cyclones, volcanoes, wildfires)
+      if (layers.gdacs) {
+        disasters.gdacs.forEach(ev => {
+          if (!ev.lat || !ev.lng) return;
+          const color = GDACS_COLORS[ev.type] || '#6b7280';
+          const icon = ev.type === 'tc' ? '🌀' : ev.type === 'fl' ? '🌊' : ev.type === 'vo' ? '🌋' : ev.type === 'wf' ? '🔥' : ev.type === 'dr' ? '🏜️' : '⚠️';
+          window.L.circleMarker([ev.lat, ev.lng], { radius: 10, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.85 })
+            .addTo(map)
+            .bindPopup(`<b>${icon} ${ev.name || ev.type?.toUpperCase()}</b><br>${ev.country || ''}<br><span style="color:${ev.alert==='red'?'#ef4444':ev.alert==='orange'?'#f97316':'#22c55e'}">${(ev.alert||'').toUpperCase()} ALERT</span><br><small>${ev.description || ''}</small>`);
+        });
+      }
+
+      // NOAA weather alerts (US bounding boxes — show as list, not map pins)
+      if (layers.weather && disasters.weather.length > 0) {
+        const center = map.getCenter();
+        window.L.popup({ maxWidth: 320 })
+          .setLatLng([38, -96])
+          .setContent(`<b>⛈️ ${disasters.weather.length} Active US Weather Alerts</b><br>Click "Weather Alerts" panel below for details.`)
+          .addTo(map);
+      }
+
+      leafletMap.current = map;
+      setTimeout(() => map.invalidateSize(), 200);
+    }
     return () => { if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; } };
-  }, [sightings, filter]);
+  }, [sightings, filter, layers, disasters, satellite]);
+
+  const totalDisasters = Object.entries(layers).filter(([,on]) => on).reduce((acc, [id]) => acc + disasters[id].length, 0);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 pb-28">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-extrabold text-white">Global Species Map</h1>
-        <select value={filter} onChange={e => setFilter(e.target.value)} className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-300">
-          <option value="all">All Species</option>
-          {SCAN_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-        </select>
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div>
+          <h1 className="text-2xl font-extrabold text-white">🌍 Global Intelligence Map</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">Live species sightings + real-time disaster data</p>
+        </div>
+        <div className="flex gap-2 items-center flex-wrap">
+          <button onClick={() => setSatellite(s => !s)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${satellite ? 'bg-blue-900/60 border-blue-600 text-blue-300' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white'}`}>
+            🛰️ {satellite ? 'Satellite' : 'Standard'}
+          </button>
+          <select value={filter} onChange={e => setFilter(e.target.value)} className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-300">
+            <option value="all">All Species</option>
+            {SCAN_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </div>
       </div>
-      {loading && <p className="text-sm text-zinc-500 mb-3">Loading sightings…</p>}
-      <div ref={mapRef} className="w-full h-[500px] rounded-2xl border border-zinc-800 overflow-hidden" />
-      <div className="flex flex-wrap gap-3 mt-3">
-        {[['plant','#22c55e'],['insect','#f59e0b'],['bird','#3b82f6'],['mushroom','#8b5cf6'],['reptile','#ef4444'],['marine','#06b6d4']].map(([k,c]) => (
-          <div key={k} className="flex items-center gap-1.5 text-xs text-zinc-400"><span className="w-3 h-3 rounded-full" style={{ background: c }} />{k}</div>
+
+      {/* Disaster layer toggles */}
+      <div className="flex gap-2 flex-wrap mb-3">
+        {DISASTER_LAYERS.map(dl => (
+          <button key={dl.id} onClick={() => toggleLayer(dl.id)} disabled={loadingDis[dl.id]}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${layers[dl.id] ? 'text-white border-opacity-60' : 'bg-zinc-900 border-zinc-700 text-zinc-500 hover:text-zinc-300'}`}
+            style={layers[dl.id] ? { background: dl.color + '22', borderColor: dl.color + '88', color: dl.color } : {}}>
+            {loadingDis[dl.id] ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin inline-block" /> : dl.icon}
+            {dl.label}
+            {layers[dl.id] && disasters[dl.id].length > 0 && <span className="ml-0.5 opacity-70">({disasters[dl.id].length})</span>}
+          </button>
         ))}
       </div>
+
+      {loading && <p className="text-sm text-zinc-500 mb-3">Loading sightings…</p>}
+
+      {/* Map */}
+      <div ref={mapRef} style={{ width: '100%', height: '520px', borderRadius: '1rem', border: '1px solid #3f3f46', background: '#0c0c0e' }} />
+
+      {/* Legend + stats */}
+      <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 items-center">
+        <p className="text-xs text-zinc-600 mr-2">Species:</p>
+        {[['plant','#22c55e'],['insect','#f59e0b'],['bird','#3b82f6'],['mushroom','#8b5cf6'],['reptile','#ef4444'],['marine','#06b6d4']].map(([k,c]) => (
+          <div key={k} className="flex items-center gap-1.5 text-xs text-zinc-400 capitalize"><span className="w-2.5 h-2.5 rounded-full" style={{ background: c }} />{k}</div>
+        ))}
+        {totalDisasters > 0 && <span className="ml-4 text-xs text-red-400 font-bold animate-pulse">{totalDisasters} live disaster events</span>}
+      </div>
+
+      {/* Disaster detail panels */}
+      {layers.weather && disasters.weather.length > 0 && (
+        <div className="mt-4 p-4 bg-amber-950/40 border border-amber-700/40 rounded-xl">
+          <h3 className="text-sm font-bold text-amber-400 mb-3">⛈️ Active US Weather Alerts ({disasters.weather.length})</h3>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {disasters.weather.slice(0, 15).map((w, i) => (
+              <div key={w.id || i} className="flex gap-3 items-start text-xs border-b border-amber-900/30 pb-2">
+                <span className={`font-bold shrink-0 ${w.severity === 'Extreme' ? 'text-red-400' : 'text-amber-400'}`}>{w.severity}</span>
+                <div>
+                  <p className="text-zinc-200 font-medium">{w.event}</p>
+                  <p className="text-zinc-500">{w.areaDesc?.slice(0, 80)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {layers.gdacs && disasters.gdacs.length > 0 && (
+        <div className="mt-4 p-4 bg-blue-950/40 border border-blue-700/40 rounded-xl">
+          <h3 className="text-sm font-bold text-blue-400 mb-3">🌍 Global Active Disasters — GDACS ({disasters.gdacs.length})</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-52 overflow-y-auto">
+            {disasters.gdacs.slice(0, 20).map((ev, i) => {
+              const icon = ev.type === 'tc' ? '🌀' : ev.type === 'fl' ? '🌊' : ev.type === 'vo' ? '🌋' : ev.type === 'wf' ? '🔥' : ev.type === 'dr' ? '🏜️' : ev.type === 'eq' ? '🔴' : '⚠️';
+              return (
+                <div key={ev.id || i} className="flex gap-2 items-start text-xs bg-zinc-900/60 rounded-lg p-2">
+                  <span className="text-base shrink-0">{icon}</span>
+                  <div>
+                    <p className="text-zinc-200 font-medium leading-tight">{ev.name}</p>
+                    <p className="text-zinc-500">{ev.country} · <span style={{ color: ev.alert === 'red' ? '#ef4444' : ev.alert === 'orange' ? '#f97316' : '#22c55e' }}>{(ev.alert || '').toUpperCase()}</span></p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {layers.relief && disasters.relief.length > 0 && (
+        <div className="mt-4 p-4 bg-purple-950/40 border border-purple-700/40 rounded-xl">
+          <h3 className="text-sm font-bold text-purple-400 mb-3">🆘 Active Disaster Reports — ReliefWeb ({disasters.relief.length})</h3>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {disasters.relief.slice(0, 12).map((r, i) => (
+              <div key={r.id || i} className="flex gap-3 items-start text-xs border-b border-purple-900/30 pb-2">
+                <span className="text-zinc-500 shrink-0">{r.type || '⚠️'}</span>
+                <div className="flex-1">
+                  <p className="text-zinc-200 font-medium">{r.name}</p>
+                  <p className="text-zinc-500">{r.country} · {r.status}</p>
+                </div>
+                {r.url && <a href={r.url} target="_blank" rel="noreferrer" className="text-purple-400 shrink-0 hover:text-purple-300">↗</a>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {layers.quakes && disasters.quakes.length > 0 && (
+        <div className="mt-4 p-4 bg-red-950/40 border border-red-700/40 rounded-xl">
+          <h3 className="text-sm font-bold text-red-400 mb-3">🔴 Recent Earthquakes M4.5+ — USGS ({disasters.quakes.length})</h3>
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            {disasters.quakes.slice(0, 15).map((eq, i) => {
+              const mag = eq.properties.mag;
+              return (
+                <div key={eq.id || i} className="flex gap-3 items-center text-xs">
+                  <span className={`font-black w-10 shrink-0 ${mag >= 7 ? 'text-red-400' : mag >= 6 ? 'text-orange-400' : 'text-amber-400'}`}>M{mag}</span>
+                  <span className="text-zinc-300 flex-1 truncate">{eq.properties.place}</span>
+                  <span className="text-zinc-600 shrink-0">{new Date(eq.properties.time).toLocaleDateString()}</span>
+                  {eq.properties.url && <a href={eq.properties.url} target="_blank" rel="noreferrer" className="text-red-400 hover:text-red-300 shrink-0">↗</a>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1153,15 +1531,21 @@ function FarmingPage() {
   const ask = async endpoint => {
     if (!query.trim()) return;
     setLoading(true); setResult(null);
-    const r = await fetch(`${API}/farming/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) }).catch(() => null);
+    let r;
+    if (endpoint === 'calendar') {
+      r = await fetch(`${API}/farming/calendar?region=${encodeURIComponent(query)}`, { credentials: 'include' }).catch(() => null);
+    } else {
+      r = await fetch(`${API}/farming/${endpoint}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) }).catch(() => null);
+    }
     if (r?.ok) setResult(await r.json());
+    else setResult({ error: 'AI unavailable — check API keys in .env' });
     setLoading(false);
   };
 
   const farmTabs = [
     { id: 'farm', label: '🌾 Farm Plan', endpoint: 'plan', placeholder: 'Describe your land — size, location, climate, goals…' },
     { id: 'hydro', label: '💧 Hydroponics', endpoint: 'hydroponics', placeholder: 'What crops? Indoor or outdoor? Budget?' },
-    { id: 'calendar', label: '📅 Calendar', endpoint: 'calendar', placeholder: 'Location and crops to grow this season' },
+    { id: 'calendar', label: '📅 Calendar', endpoint: 'calendar', placeholder: 'Enter your region, e.g. Philippines, Vietnam, Texas…' },
   ];
   const current = farmTabs.find(t => t.id === tab) || farmTabs[0];
 
@@ -1179,23 +1563,41 @@ function FarmingPage() {
       <Textarea label="Describe your situation" value={query} onChange={e => setQuery(e.target.value)} placeholder={current.placeholder} className="mb-4" rows={4} />
       <Btn onClick={() => ask(current.endpoint)} disabled={loading || !query.trim()} className="w-full mb-6">{loading ? '🔄 Generating plan…' : '🌱 Generate Plan'}</Btn>
       {result && (
-        <Card className="p-5">
-          {result.plan && <div className="mb-4"><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">Plan</p><p className="text-sm text-zinc-300 whitespace-pre-wrap">{result.plan}</p></div>}
-          {result.crops?.length > 0 && (
-            <div className="mb-4">
+        <Card className="p-5 space-y-4">
+          {result.error && <p className="text-sm text-red-400">{result.error}</p>}
+          {/* Farm plan / hydroponics response (advice object) */}
+          {result.advice?.summary && <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">Summary</p><p className="text-sm text-zinc-300 leading-relaxed">{result.advice.summary}</p></div>}
+          {result.advice?.soil_preparation && <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Soil Preparation</p><p className="text-sm text-zinc-400">{result.advice.soil_preparation}</p></div>}
+          {result.advice?.recommended_crops?.length > 0 && (
+            <div>
               <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">Recommended Crops</p>
-              <div className="flex flex-wrap gap-2">{result.crops.map((c, i) => <Badge key={i} color="green">{c}</Badge>)}</div>
+              <div className="space-y-2">{result.advice.recommended_crops.map((c, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm"><span className="text-green-400">🌱</span><span className="text-zinc-200 font-medium">{c.name || c}</span>{c.days_to_harvest && <Badge color="amber">{c.days_to_harvest} days</Badge>}{c.difficulty && <Badge color="blue">{c.difficulty}</Badge>}</div>
+              ))}</div>
             </div>
           )}
-          {result.materials?.length > 0 && (
-            <div className="mb-4">
-              <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">Materials Needed</p>
-              <ul className="space-y-1">{result.materials.map((m, i) => <li key={i} className="text-sm text-zinc-300 flex gap-2"><span className="text-green-400">•</span>{m}</li>)}</ul>
+          {result.advice?.fertilizer_plan && <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Fertilizer Plan</p><p className="text-sm text-zinc-400">{result.advice.fertilizer_plan}</p></div>}
+          {result.advice?.pest_prevention && <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Pest Prevention</p><p className="text-sm text-zinc-400">{result.advice.pest_prevention}</p></div>}
+          {result.advice?.cost_breakdown && (
+            <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Estimated Cost</p>
+            <p className="text-lg font-bold text-amber-400">${result.advice.cost_breakdown.total?.toLocaleString() || '—'}</p></div>
+          )}
+          {result.advice?.market_potential && <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Market Potential</p><p className="text-sm text-zinc-400">{result.advice.market_potential}</p></div>}
+          {/* Hydroponics response */}
+          {result.setup && <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Setup</p><p className="text-sm text-zinc-300 whitespace-pre-wrap">{typeof result.setup === 'string' ? result.setup : JSON.stringify(result.setup, null, 2)}</p></div>}
+          {/* Calendar response */}
+          {result.calendar?.length > 0 && (
+            <div>
+              <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-3">Monthly Calendar — {result.country || ''}</p>
+              <div className="space-y-3">{result.calendar.slice(0,6).map((m, i) => (
+                <div key={i} className="border border-zinc-800 rounded-lg p-3">
+                  <p className="text-xs font-bold text-green-400 mb-1">{m.month}</p>
+                  {m.planting && <p className="text-xs text-zinc-400"><span className="text-zinc-500">🌱 Plant:</span> {m.planting}</p>}
+                  {m.harvest && <p className="text-xs text-zinc-400 mt-0.5"><span className="text-zinc-500">🌾 Harvest:</span> {m.harvest}</p>}
+                </div>
+              ))}</div>
             </div>
           )}
-          {result.estimated_cost && <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Estimated Cost</p><p className="text-sm text-amber-400 font-bold">{result.estimated_cost}</p></div>}
-          {result.timeline && <div className="mt-3"><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Timeline</p><p className="text-sm text-zinc-300">{result.timeline}</p></div>}
-          {result.raw && <p className="text-sm text-zinc-300 whitespace-pre-wrap">{result.raw}</p>}
         </Card>
       )}
     </div>
@@ -1347,7 +1749,7 @@ function ProfilePage({ onNav }) {
 
   const saveProfile = async e => {
     e.preventDefault(); setSaving(true); setMsg('');
-    const r = await fetch(`${API}/auth/profile`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }).catch(() => null);
+    const r = await fetch(`${API}/auth/profile`, { method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }).catch(() => null);
     if (r?.ok) { await refreshUser(); setMsg('Profile updated!'); }
     else setMsg('Update failed.');
     setSaving(false);
@@ -1357,7 +1759,7 @@ function ProfilePage({ onNav }) {
     e.preventDefault();
     if (pw.next !== pw.confirm) { setMsg('Passwords do not match'); return; }
     setSaving(true); setMsg('');
-    const r = await fetch(`${API}/auth/password`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current_password: pw.current, new_password: pw.next }) }).catch(() => null);
+    const r = await fetch(`${API}/auth/change-password`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ current_password: pw.current, new_password: pw.next }) }).catch(() => null);
     setMsg(r?.ok ? 'Password changed!' : 'Password change failed.'); setSaving(false);
   };
 

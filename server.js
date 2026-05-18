@@ -39,7 +39,8 @@ app.post('/api/scan', upload.single('photo'), async (req, res) => {
 
   try {
     const result = await analyzePlant(req.file.path);
-    const id = insertScan({ filename: req.file.filename, ...result });
+    const { rows } = await insertScan({ filename: req.file.filename, ...result });
+    const id = rows[0]?.id;
     res.json({
       id,
       filename: req.file.filename,
@@ -52,9 +53,14 @@ app.post('/api/scan', upload.single('photo'), async (req, res) => {
   }
 });
 
-app.get('/api/history', (_req, res) => {
-  const rows = listScans().map((r) => ({ ...r, url: `/uploads/${r.filename}` }));
-  res.json(rows);
+app.get('/api/history', async (_req, res) => {
+  try {
+    const rows = await listScans();
+    res.json(rows.map((r) => ({ ...r, url: `/uploads/${r.filename}` })));
+  } catch (err) {
+    console.error('history error:', err);
+    res.status(500).json({ error: 'Failed to load history' });
+  }
 });
 
 app.use((err, _req, res, _next) => {
