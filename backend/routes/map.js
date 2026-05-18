@@ -137,4 +137,51 @@ router.get('/stats', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// ── GET /api/map/tiles/:style/:z/:x/:y — tile proxy ──────────
+// Proxies map tiles server-side so browser CDN blocking never causes a blank map.
+// Caches tiles for 24h. Tries CartoDB dark first, falls back to OSM.
+const TILE_CACHE = new Map(); // key -> { buf, contentType, ts }
+const TILE_TTL   = 24 * 60 * 60 * 1000;
+
+router.get('/tiles/:style/:z/:x/:y', async (req, res) => {
+  const { style, z, x, y } = req.params;
+  const cacheKey = `${style}/${z}/${x}/${y}`;
+
+  const hit = TILE_CACHE.get(cacheKey);
+  if (hit && Date.now() - hit.ts < TILE_TTL) {
+    res.set({ 'Content-Type': hit.contentType, 'Cache-Control': 'public, max-age=86400', 'X-Tile-Source': 'cache' });
+    return res.send(hit.buf);
+  }
+
+  const sub  = ['a','b','c','d'][Math.floor(Math.random()*4)];
+  const urls = style === 'satellite'
+    ? [`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`]
+    : [
+        `https://${sub}.basemaps.cartocdn.com/dark_all/${z}/${x}/${y}.png`,
+        `https://${sub}.tile.openstreetmap.org/${z}/${x}/${y}.png`,
+        `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+      ];
+
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, {
+        headers: { 'User-Agent': 'FloraIQ/2.0', 'Referer': 'https://floraiq.app' },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!r.ok) continue;
+      const buf = Buffer.from(await r.arrayBuffer());
+      const ct  = r.headers.get('content-type') || 'image/png';
+      TILE_CACHE.set(cacheKey, { buf, contentType: ct, ts: Date.now() });
+      // Evict cache if too large (keep under ~50MB)
+      if (TILE_CACHE.size > 5000) {
+        const oldest = [...TILE_CACHE.entries()].sort((a,b) => a[1].ts - b[1].ts)[0][0];
+        TILE_CACHE.delete(oldest);
+      }
+      res.set({ 'Content-Type': ct, 'Cache-Control': 'public, max-age=86400', 'X-Tile-Source': url });
+      return res.send(buf);
+    } catch { /* try next */ }
+  }
+  res.status(404).end();
+});
+
 module.exports = router;

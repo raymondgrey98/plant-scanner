@@ -1474,11 +1474,11 @@ function MapPage() {
       if (!mapRef.current || typeof window.L === 'undefined') return;
       if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; }
       const map = window.L.map(mapRef.current, { center: [20, 0], zoom: 2, zoomControl: true });
-      const darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-      const esriTile = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-      const tileUrl  = satellite ? esriTile : darkTile;
-      const tileAttr = satellite ? 'Tiles © Esri — USGS, NOAA' : '© OpenStreetMap contributors © CARTO';
-      tileLayerRef.current = window.L.tileLayer(tileUrl, { attribution: tileAttr, subdomains: 'abcd', maxZoom: 19 }).addTo(map);
+      // Tiles are served via our own backend proxy to bypass any CDN blocking
+      const style   = satellite ? 'satellite' : 'dark';
+      const tileUrl = `${API}/map/tiles/${style}/{z}/{x}/{y}`;
+      const tileAttr = satellite ? 'Tiles © Esri / USGS / NOAA' : '© CartoDB / OpenStreetMap contributors';
+      tileLayerRef.current = window.L.tileLayer(tileUrl, { attribution: tileAttr, maxZoom: 19, errorTileUrl: '' }).addTo(map);
       const colorMap = { plant: '#22c55e', insect: '#f59e0b', bird: '#3b82f6', mushroom: '#8b5cf6', reptile: '#ef4444', marine: '#06b6d4', survival: '#f97316' };
       const filtered = filter === 'all' ? sightings : sightings.filter(s => s.scan_mode === filter);
       filtered.forEach(s => {
