@@ -259,6 +259,7 @@ function NotifPanel({ open, onClose }) {
 const NAV_ITEMS = [
   { id: 'home',      label: 'Home',      icon: '🏠' },
   { id: 'scan',      label: 'Identify',  icon: '📷' },
+  { id: 'sos',       label: 'SOS',       icon: '🆘' },
   { id: 'survival',  label: 'Survival',  icon: '🏕️' },
   { id: 'map',       label: 'Map',       icon: '🗺️' },
   { id: 'farming',   label: 'Farm',      icon: '🌾' },
@@ -272,7 +273,7 @@ const NAV_ITEMS = [
 const BOTTOM_NAV = [
   { id: 'home',      label: 'Home',    icon: '🏠' },
   { id: 'scan',      label: 'Scan',    icon: '📷' },
-  { id: 'survival',  label: 'Survive', icon: '🏕️' },
+  { id: 'sos',       label: 'SOS',     icon: '🆘' },
   { id: 'landscape', label: 'Terrain', icon: '🌍' },
   { id: 'map',       label: 'Map',     icon: '🗺️' },
 ];
@@ -1421,6 +1422,7 @@ const DISASTER_LAYERS = [
   { id: 'fires',    label: 'Active Fires',   icon: '🔥', color: '#f97316' },
   { id: 'weather',  label: 'Weather Alerts', icon: '⛈️', color: '#f59e0b' },
   { id: 'relief',   label: 'Active Disasters',icon: '🆘', color: '#a855f7' },
+  { id: 'radar',    label: 'Live Radar',     icon: '🌧️', color: '#06b6d4' },
 ];
 
 const GDACS_COLORS = { eq: '#ef4444', tc: '#8b5cf6', fl: '#3b82f6', dr: '#f59e0b', wf: '#f97316', vo: '#dc2626' };
@@ -1433,10 +1435,11 @@ function MapPage() {
   const [filter, setFilter]         = useState('all');
   const [loading, setLoading]       = useState(true);
   const [satellite, setSatellite]   = useState(false);
-  const [layers, setLayers]         = useState({ quakes: false, gdacs: false, fires: false, weather: false, relief: false });
-  const [disasters, setDisasters]   = useState({ quakes: [], gdacs: [], fires: [], weather: [], relief: [] });
+  const [layers, setLayers]         = useState({ quakes: false, gdacs: false, fires: false, weather: false, relief: false, radar: false });
+  const [disasters, setDisasters]   = useState({ quakes: [], gdacs: [], fires: [], weather: [], relief: [], radar: [] });
   const [loadingDis, setLoadingDis] = useState({});
   const [disPanel, setDisPanel]     = useState(null);
+  const [radarTs, setRadarTs]       = useState(null);
 
   useEffect(() => {
     fetch(`${API}/map/sightings?limit=500`).then(r => r.json()).then(d => setSightings(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoading(false));
@@ -1445,6 +1448,21 @@ function MapPage() {
   const toggleLayer = async (id) => {
     const next = !layers[id];
     setLayers(l => ({ ...l, [id]: next }));
+
+    if (id === 'radar') {
+      if (next && !radarTs) {
+        setLoadingDis(l => ({ ...l, radar: true }));
+        try {
+          const r = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+          const d = await r.json();
+          const ts = d.radar?.past?.[d.radar.past.length - 1]?.time;
+          if (ts) setRadarTs(ts);
+        } catch {}
+        setLoadingDis(l => ({ ...l, radar: false }));
+      }
+      return;
+    }
+
     if (next && disasters[id].length === 0) {
       setLoadingDis(l => ({ ...l, [id]: true }));
       try {
@@ -1527,20 +1545,27 @@ function MapPage() {
 
       // NOAA weather alerts (US bounding boxes — show as list, not map pins)
       if (layers.weather && disasters.weather.length > 0) {
-        const center = map.getCenter();
         window.L.popup({ maxWidth: 320 })
           .setLatLng([38, -96])
           .setContent(`<b>⛈️ ${disasters.weather.length} Active US Weather Alerts</b><br>Click "Weather Alerts" panel below for details.`)
           .addTo(map);
       }
 
+      // RainViewer live precipitation radar overlay
+      if (layers.radar && radarTs) {
+        window.L.tileLayer(
+          `https://tilecache.rainviewer.com/v2/radar/${radarTs}/512/{z}/{x}/{y}/4/1_1.png`,
+          { opacity: 0.55, attribution: '© RainViewer', errorTileUrl: '', maxZoom: 12 }
+        ).addTo(map);
+      }
+
       leafletMap.current = map;
       setTimeout(() => map.invalidateSize(), 200);
     }
     return () => { if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; } };
-  }, [sightings, filter, layers, disasters, satellite]);
+  }, [sightings, filter, layers, disasters, satellite, radarTs]);
 
-  const totalDisasters = Object.entries(layers).filter(([,on]) => on).reduce((acc, [id]) => acc + disasters[id].length, 0);
+  const totalDisasters = Object.entries(layers).filter(([id, on]) => on && id !== 'radar').reduce((acc, [id]) => acc + (disasters[id]?.length || 0), 0);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 pb-28">
@@ -1790,6 +1815,26 @@ function FarmingPage() {
           {result.advice?.market_potential && <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Market Potential</p><p className="text-sm text-zinc-400">{result.advice.market_potential}</p></div>}
           {/* Hydroponics response */}
           {result.setup && <div><p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-1">Setup</p><p className="text-sm text-zinc-300 whitespace-pre-wrap">{typeof result.setup === 'string' ? result.setup : JSON.stringify(result.setup, null, 2)}</p></div>}
+          {/* Hydroponic e-commerce sourcing */}
+          {tab === 'hydro' && !result.error && (
+            <div>
+              <p className="text-xs font-bold text-zinc-500 uppercase tracking-wide mb-2">🛒 Source Components</p>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: '🏭 Alibaba', href: `https://www.alibaba.com/trade/search?SearchText=${encodeURIComponent('hydroponic system ' + (query.split(' ').slice(0,3).join(' ')))}`, cls: 'border-orange-700/40 bg-orange-950/20 text-orange-400 hover:bg-orange-950/40' },
+                  { label: '📦 Amazon', href: `https://www.amazon.com/s?k=${encodeURIComponent('hydroponic system ' + (query.split(' ').slice(0,3).join(' ')))}`, cls: 'border-amber-700/40 bg-amber-950/20 text-amber-400 hover:bg-amber-950/40' },
+                  { label: '🛍 AliExpress', href: `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent('hydroponics kit')}`, cls: 'border-red-700/40 bg-red-950/20 text-red-400 hover:bg-red-950/40' },
+                  { label: '🏪 eBay', href: `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent('hydroponic grow kit')}`, cls: 'border-blue-700/40 bg-blue-950/20 text-blue-400 hover:bg-blue-950/40' },
+                ].map(s => (
+                  <a key={s.label} href={s.href} target="_blank" rel="noreferrer"
+                    className={`flex items-center justify-center px-3 py-2.5 border rounded-xl text-sm font-bold transition-colors ${s.cls}`}>
+                    {s.label}
+                  </a>
+                ))}
+              </div>
+              <p className="text-xs text-zinc-600 mt-2 text-center">Search results open in new tab — compare prices before buying</p>
+            </div>
+          )}
           {/* Calendar response */}
           {result.calendar?.length > 0 && (
             <div>
@@ -3705,6 +3750,243 @@ function FloraBot() {
   );
 }
 
+// ── SOS Survival Scanner ──────────────────────────────────────
+function LastSOSResult() {
+  const [last, setLast] = useState(null);
+  useEffect(() => {
+    try { const c = JSON.parse(localStorage.getItem('sos_cache') || '[]'); if (c.length) setLast(c[0]); } catch {}
+  }, []);
+  if (!last) return null;
+  const col = last.risk_level === 'CRITICAL' ? 'text-red-400' : last.risk_level === 'WARNING' ? 'text-amber-400' : 'text-green-400';
+  return (
+    <div className="max-w-sm mx-auto mt-6 p-4 bg-zinc-900/60 border border-zinc-800 rounded-2xl">
+      <p className="text-xs text-zinc-600 uppercase tracking-widest mb-2">Last Scan (cached)</p>
+      <div className="flex items-center gap-2">
+        <span className={`font-bold text-sm ${col}`}>{last.risk_level}</span>
+        <span className="text-zinc-400 text-sm">— {last.organism || 'Unknown'}</span>
+      </div>
+      {last.timestamp && <p className="text-xs text-zinc-700 mt-1">{new Date(last.timestamp).toLocaleString()}</p>}
+    </div>
+  );
+}
+
+function SOSPage() {
+  const fileRef  = useRef(null);
+  const [image, setImage]       = useState(null);
+  const [imageData, setImageData] = useState(null);
+  const [gps, setGps]           = useState(null);
+  const [gpsStatus, setGpsStatus] = useState('getting');
+  const [scanning, setScanning] = useState(false);
+  const [result, setResult]     = useState(null);
+  const [error, setError]       = useState(null);
+  const [offline, setOffline]   = useState(false);
+
+  useEffect(() => {
+    navigator.geolocation.getCurrentPosition(
+      pos => { setGps({ lat: pos.coords.latitude, lng: pos.coords.longitude }); setGpsStatus('ok'); },
+      ()  => setGpsStatus('denied'),
+      { timeout: 10000, enableHighAccuracy: true, maximumAge: 60000 }
+    );
+  }, []);
+
+  const handleCapture = e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => { setImage(ev.target.result); setImageData(ev.target.result); };
+    reader.readAsDataURL(file);
+  };
+
+  const scan = async () => {
+    if (!imageData) return;
+    setScanning(true); setError(null);
+    try {
+      const r = await fetch(`${API}/sos/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageData, lat: gps?.lat, lng: gps?.lng }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!r.ok) throw new Error('AI scan failed');
+      const data = await r.json();
+      setResult(data);
+      try {
+        const cache = JSON.parse(localStorage.getItem('sos_cache') || '[]');
+        cache.unshift({ ...data, timestamp: Date.now(), gps });
+        localStorage.setItem('sos_cache', JSON.stringify(cache.slice(0, 5)));
+      } catch {}
+    } catch {
+      try {
+        const cache = JSON.parse(localStorage.getItem('sos_cache') || '[]');
+        if (cache.length) { setResult({ ...cache[0], source: 'offline_cache' }); setOffline(true); }
+        else throw new Error('No cached data available');
+      } catch {
+        setError('Network error. Call emergency services directly: 911 / 112 / 999');
+      }
+    }
+    setScanning(false);
+  };
+
+  const reset = () => { setImage(null); setImageData(null); setResult(null); setError(null); setOffline(false); };
+
+  if (scanning) return (
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center px-4">
+      <div className="w-20 h-20 border-4 border-red-500 border-t-transparent rounded-full animate-spin mb-6" />
+      <p className="text-red-400 text-xl font-bold tracking-wide animate-pulse">Analyzing for threats…</p>
+      <p className="text-zinc-600 text-sm mt-2">AI scanning image + GPS coordinates</p>
+    </div>
+  );
+
+  if (result) {
+    const isCrit = result.risk_level === 'CRITICAL';
+    const isWarn = result.risk_level === 'WARNING';
+    const riskCol = isCrit ? 'text-red-400' : isWarn ? 'text-amber-400' : 'text-green-400';
+    const riskBorder = isCrit ? 'border-red-500 bg-red-950/50' : isWarn ? 'border-amber-500 bg-amber-950/50' : 'border-green-500 bg-green-950/50';
+    return (
+      <div className="min-h-screen bg-black px-4 py-6 pb-28 max-w-lg mx-auto">
+        {offline && <div className="mb-4 p-3 border border-amber-700/50 bg-amber-950/30 rounded-xl text-xs text-amber-400 text-center">⚠️ Offline mode — showing cached result. Call emergency services directly.</div>}
+        {/* Risk banner */}
+        <div className={`w-full rounded-2xl p-6 mb-5 text-center border-2 ${riskBorder}`}>
+          <div className={`text-5xl mb-2 ${isCrit ? 'animate-pulse' : ''}`}>{isCrit ? '🚨' : isWarn ? '⚠️' : '✅'}</div>
+          <div className={`text-3xl font-black tracking-widest mb-1 ${riskCol}`}>{result.risk_level}</div>
+          <p className="text-white font-bold text-lg">{result.organism || 'Unknown organism'}</p>
+          {result.scientific_name && <p className="text-zinc-500 text-sm italic mt-0.5">{result.scientific_name}</p>}
+        </div>
+        {/* Immediate action */}
+        {result.immediate_action && (
+          <div className={`mb-4 p-4 rounded-xl border ${isCrit ? 'border-red-600/60 bg-red-950/40' : 'border-amber-600/60 bg-amber-950/30'}`}>
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-1">Do This NOW</p>
+            <p className={`font-bold text-base leading-snug ${isCrit ? 'text-red-300' : 'text-amber-300'}`}>{result.immediate_action}</p>
+          </div>
+        )}
+        {/* First aid steps */}
+        {result.first_aid_steps?.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">First Aid Steps</p>
+            <div className="space-y-3">
+              {result.first_aid_steps.map((step, i) => (
+                <div key={i} className="flex gap-3 items-start p-4 bg-zinc-900/80 border border-zinc-800 rounded-xl">
+                  <span className={`text-2xl font-black w-8 shrink-0 ${riskCol}`}>{i + 1}</span>
+                  <p className="text-zinc-200 text-base leading-snug">{step}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* DO NOT */}
+        {result.do_not && (
+          <div className="mb-4 p-4 bg-red-950/25 border border-red-700/40 rounded-xl">
+            <p className="text-xs font-bold text-red-500 uppercase tracking-widest mb-1">Critical — Do NOT</p>
+            <p className="text-red-300 font-medium text-sm">{result.do_not}</p>
+          </div>
+        )}
+        {/* Emergency numbers */}
+        {result.emergency_numbers && (
+          <div className="mb-4">
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3">Emergency Numbers</p>
+            <div className="grid grid-cols-2 gap-3">
+              <a href={`tel:${result.emergency_numbers.primary}`} className="flex flex-col items-center py-4 bg-red-600 hover:bg-red-500 rounded-2xl transition-colors">
+                <span className="text-3xl font-black text-white">{result.emergency_numbers.primary}</span>
+                <span className="text-red-200 text-xs mt-0.5">Primary Emergency</span>
+              </a>
+              <a href={`tel:${result.emergency_numbers.secondary}`} className="flex flex-col items-center py-4 bg-zinc-800 hover:bg-zinc-700 rounded-2xl transition-colors">
+                <span className="text-3xl font-black text-white">{result.emergency_numbers.secondary}</span>
+                <span className="text-zinc-400 text-xs mt-0.5">International</span>
+              </a>
+            </div>
+            {result.emergency_numbers.local_note && <p className="text-xs text-zinc-600 mt-2 text-center">{result.emergency_numbers.local_note}</p>}
+          </div>
+        )}
+        {/* YouTube first aid video */}
+        {result.youtube_query && (
+          <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(result.youtube_query)}`}
+            target="_blank" rel="noreferrer"
+            className="block w-full p-4 bg-red-900/30 border border-red-700/40 rounded-xl text-center mb-4 hover:bg-red-900/50 transition-colors">
+            <p className="text-red-400 font-bold">▶ Watch Emergency First Aid Video</p>
+            <p className="text-xs text-zinc-600 mt-0.5 truncate">{result.youtube_query}</p>
+          </a>
+        )}
+        {result.notes && (
+          <div className="mb-4 p-3 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+            <p className="text-xs text-zinc-600 mb-1">Medical Note</p>
+            <p className="text-sm text-zinc-400">{result.notes}</p>
+          </div>
+        )}
+        <button onClick={reset} className="w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-zinc-300 font-bold text-lg transition-colors">
+          ← Scan Again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-black px-4 py-8 pb-28">
+      <div className="text-center mb-8">
+        <div className="text-6xl mb-3">🆘</div>
+        <h1 className="text-3xl font-black text-white tracking-widest">SOS SCANNER</h1>
+        <p className="text-zinc-600 text-sm mt-1">Emergency hazard identification — snap a photo, get instant first aid</p>
+      </div>
+      {/* GPS status */}
+      <div className={`flex items-center gap-2 px-4 py-3 rounded-xl mb-6 max-w-sm mx-auto border ${
+        gpsStatus === 'ok' ? 'bg-green-950/30 border-green-700/40' :
+        gpsStatus === 'denied' ? 'bg-red-950/30 border-red-700/40' : 'bg-zinc-900 border-zinc-800'
+      }`}>
+        <span>{gpsStatus === 'ok' ? '📍' : gpsStatus === 'denied' ? '⚠️' : '⏳'}</span>
+        <span className={`text-sm font-medium ${gpsStatus === 'ok' ? 'text-green-400' : gpsStatus === 'denied' ? 'text-red-400' : 'text-zinc-500'}`}>
+          {gpsStatus === 'ok' ? `GPS locked ${gps.lat.toFixed(4)}, ${gps.lng.toFixed(4)}` :
+           gpsStatus === 'denied' ? 'GPS unavailable — location-adaptive numbers may not apply' :
+           'Getting GPS location…'}
+        </span>
+      </div>
+      {/* Image preview + scan */}
+      {image ? (
+        <div className="mb-6 max-w-sm mx-auto">
+          <img src={image} className="w-full rounded-2xl border border-zinc-700 mb-3" alt="Captured" />
+          <div className="flex gap-3">
+            <button onClick={scan} className="flex-1 py-4 bg-red-600 hover:bg-red-500 active:scale-95 rounded-2xl text-white font-black text-lg transition-all shadow-lg shadow-red-500/30">
+              🔍 SCAN FOR THREATS
+            </button>
+            <button onClick={reset} className="px-4 py-4 bg-zinc-800 hover:bg-zinc-700 rounded-2xl text-zinc-400 font-bold transition-colors">✕</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-col items-center gap-4 mb-8">
+            <button onClick={() => fileRef.current?.click()}
+              className="w-40 h-40 rounded-full bg-red-600 hover:bg-red-500 active:scale-95 flex flex-col items-center justify-center border-4 border-red-400 transition-all shadow-2xl shadow-red-600/40">
+              <span className="text-5xl">📷</span>
+              <span className="text-white font-black text-xs mt-1 tracking-wide">SNAP PHOTO</span>
+            </button>
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleCapture} />
+            <p className="text-zinc-600 text-sm text-center max-w-xs leading-relaxed">
+              Point at snake, mushroom, plant, spider, or any potential hazard. AI will identify it and give emergency instructions.
+            </p>
+          </div>
+          <div className="mb-6 max-w-sm mx-auto">
+            <p className="text-xs text-zinc-700 uppercase tracking-widest text-center mb-3">Quick Emergency Dial</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[['911','US/CA'], ['112','Global'], ['999','UK/MY'], ['000','AU'], ['119','ID'], ['143','PH']].map(([num, label]) => (
+                <a key={num} href={`tel:${num}`}
+                  className="flex flex-col items-center py-3 px-2 bg-zinc-900 border border-zinc-800 hover:border-red-600 rounded-xl transition-colors">
+                  <span className="text-lg font-black text-white">{num}</span>
+                  <span className="text-xs text-zinc-600">{label}</span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+      {error && (
+        <div className="max-w-sm mx-auto p-4 bg-red-950/40 border border-red-700 rounded-xl text-center mb-4">
+          <p className="text-red-400 font-bold mb-1">Scan Failed</p>
+          <p className="text-zinc-400 text-sm">{error}</p>
+        </div>
+      )}
+      {!image && <LastSOSResult />}
+    </div>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState('home');
@@ -3761,6 +4043,7 @@ export default function App() {
           <main className="pb-24">
             {page === 'home'      && <HomePage onNav={onNav} />}
             {page === 'scan'      && <ScanPage onNav={onNav} />}
+            {page === 'sos'       && <SOSPage />}
             {page === 'history'   && <HistoryPage />}
             {page === 'library'   && <LibraryPage />}
             {page === 'survival'  && <SurvivalPage onNav={onNav} />}

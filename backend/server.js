@@ -33,6 +33,7 @@ const farmOpsRoutes      = require('./routes/farm-ops');
 const newsRoutes         = require('./routes/news');
 const landscapeRoutes    = require('./routes/landscape');
 const disastersRoutes    = require('./routes/disasters');
+const sosRoutes          = require('./routes/sos');
 
 const PORT = process.env.PORT || 3001;
 const app  = express();
@@ -60,8 +61,8 @@ app.use(helmet({
 
 // ── Body parsers ──────────────────────────────────────────────
 app.use('/api/subscription/stripe/webhook', express.raw({ type: 'application/json' }));
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // ── Logging ───────────────────────────────────────────────────
@@ -120,6 +121,7 @@ app.use('/api/farm-ops',                 farmOpsRoutes);
 app.use('/api/news',                     newsRoutes);
 app.use('/api/landscape',    scanLimit,  landscapeRoutes);
 app.use('/api/disasters',                disastersRoutes);
+app.use('/api/sos',                      sosRoutes);
 
 // ── Health + status ───────────────────────────────────────────
 app.get('/api/status', (_req, res) => {
