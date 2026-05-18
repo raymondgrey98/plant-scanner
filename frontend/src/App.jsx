@@ -2,6 +2,8 @@ import { Component, createContext, useCallback, useContext, useEffect, useRef, u
 
 const API = import.meta.env.VITE_API_BASE_URL || '/api';
 
+const escHtml = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 // ── Error Boundary ────────────────────────────────────────────
 class ErrorBoundary extends Component {
   state = { err: null };
@@ -260,6 +262,7 @@ const NAV_ITEMS = [
   { id: 'survival',  label: 'Survival',  icon: '🏕️' },
   { id: 'map',       label: 'Map',       icon: '🗺️' },
   { id: 'farming',   label: 'Farm',      icon: '🌾' },
+  { id: 'farm-ops',  label: 'Farm Ops',  icon: '🚜' },
   { id: 'landscape', label: 'Landscape', icon: '🌍' },
   { id: 'library',   label: 'Library',   icon: '📚' },
   { id: 'history',   label: 'History',   icon: '🕒' },
@@ -1008,52 +1011,104 @@ function HistoryPage() {
 }
 
 // ── Library Page ──────────────────────────────────────────────
+// taxonId = iNaturalist's internal taxon ID — used with observations/species_counts
+// ancestor_id = same ID used to scope text searches to descendants of that taxon
 const LIB_CATS = [
-  { id: 'Plantae',        label: 'Plants',    icon: '🌿', color: '#22c55e', desc: 'Flowers, trees, herbs, crops' },
-  { id: 'Insecta',        label: 'Insects',   icon: '🐛', color: '#f59e0b', desc: 'Beetles, butterflies, ants' },
-  { id: 'Aves',           label: 'Birds',     icon: '🐦', color: '#3b82f6', desc: 'All bird species worldwide' },
-  { id: 'Fungi',          label: 'Mushrooms', icon: '🍄', color: '#8b5cf6', desc: 'Edible, toxic, medicinal fungi' },
-  { id: 'Reptilia',       label: 'Reptiles',  icon: '🦎', color: '#ef4444', desc: 'Snakes, lizards, turtles' },
-  { id: 'Actinopterygii', label: 'Marine',    icon: '🐠', color: '#06b6d4', desc: 'Fish, coral, ocean life' },
-  { id: 'Mammalia',       label: 'Mammals',   icon: '🐆', color: '#f97316', desc: 'Wild mammals and predators' },
-  { id: 'Arachnida',      label: 'Spiders',   icon: '🕷️', color: '#a78bfa', desc: 'Spiders, scorpions, mites' },
+  { id: 'Plantae',        taxonId: 47126, label: 'Plants',    icon: '🌿', color: '#22c55e', desc: 'Flowers, trees, herbs, crops' },
+  { id: 'Insecta',        taxonId: 47158, label: 'Insects',   icon: '🐛', color: '#f59e0b', desc: 'Beetles, butterflies, ants' },
+  { id: 'Aves',           taxonId: 3,     label: 'Birds',     icon: '🐦', color: '#3b82f6', desc: 'All bird species worldwide' },
+  { id: 'Fungi',          taxonId: 47170, label: 'Mushrooms', icon: '🍄', color: '#8b5cf6', desc: 'Edible, toxic, medicinal fungi' },
+  { id: 'Reptilia',       taxonId: 26036, label: 'Reptiles',  icon: '🦎', color: '#ef4444', desc: 'Snakes, lizards, turtles' },
+  { id: 'Actinopterygii', taxonId: 47178, label: 'Marine',    icon: '🐠', color: '#06b6d4', desc: 'Fish, coral, ocean life' },
+  { id: 'Mammalia',       taxonId: 40151, label: 'Mammals',   icon: '🐆', color: '#f97316', desc: 'Wild mammals and predators' },
+  { id: 'Arachnida',      taxonId: 47119, label: 'Spiders',   icon: '🕷️', color: '#a78bfa', desc: 'Spiders, scorpions, mites' },
 ];
 
 const STATUS_COLORS = { LC: '#22c55e', NT: '#84cc16', VU: '#f59e0b', EN: '#f97316', CR: '#ef4444', EW: '#dc2626', EX: '#7f1d1d' };
 
 function SpeciesModal({ sp, onClose }) {
-  const inatUrl = `https://www.inaturalist.org/taxa/${sp.id}`;
-  const wikiUrl = sp.wikipedia_url;
-  const status = sp.conservation_status?.status?.toUpperCase() || 'LC';
+  const inatUrl    = `https://www.inaturalist.org/taxa/${sp.id}`;
+  const wikiUrl    = sp.wikipedia_url;
+  const status     = sp.conservation_status?.status?.toUpperCase() || 'LC';
   const statusColor = STATUS_COLORS[status] || '#6b7280';
-  const img = sp.default_photo?.medium_url;
-  const obs = sp.observations_count ? sp.observations_count.toLocaleString() : '—';
+  const img        = sp.default_photo?.medium_url;
+  const obs        = sp.observations_count ? sp.observations_count.toLocaleString() : '—';
+  const name       = sp.preferred_common_name || sp.name;
+  const sciName    = sp.name;
+  const taxon      = sp.iconic_taxon_name || '';
+  const ytQuery    = encodeURIComponent(`${name} ${sciName} species wildlife`);
+  const ytSearchUrl = `https://www.youtube.com/results?search_query=${ytQuery}`;
+
+  // Category-specific sources
+  const extraSources = [];
+  if (taxon === 'Aves')      extraSources.push({ label: '🐦 eBird — Bird Sightings & Range Maps', url: `https://ebird.org/search?q=${encodeURIComponent(sciName)}`, bg: 'bg-teal-900 hover:bg-teal-800' }, { label: '🦅 All About Birds (Cornell)', url: `https://www.allaboutbirds.org/guide/search/?q=${encodeURIComponent(name)}`, bg: 'bg-sky-900 hover:bg-sky-800' }, { label: '🪶 Audubon Society', url: `https://www.audubon.org/search#${encodeURIComponent(name)}`, bg: 'bg-blue-900 hover:bg-blue-800' });
+  if (taxon === 'Insecta')   extraSources.push({ label: '🐛 BugGuide — North American Insects', url: `https://bugguide.net/index.php?q=search&keys=${encodeURIComponent(sciName)}`, bg: 'bg-amber-900 hover:bg-amber-800' }, { label: '🦋 Butterflies & Moths of NA', url: `https://www.butterfliesandmoths.org/search?field_scientific_name=${encodeURIComponent(sciName)}`, bg: 'bg-orange-900 hover:bg-orange-800' });
+  if (taxon === 'Fungi')     extraSources.push({ label: '🍄 Mushroom Observer', url: `https://mushroomobserver.org/observer/lookup_name?name=${encodeURIComponent(sciName)}`, bg: 'bg-purple-900 hover:bg-purple-800' }, { label: '🔬 Index Fungorum', url: `https://www.indexfungorum.org/names/Names.asp?name=${encodeURIComponent(sciName)}`, bg: 'bg-violet-900 hover:bg-violet-800' });
+  if (taxon === 'Reptilia')  extraSources.push({ label: '🦎 Reptile Database', url: `https://www.reptile-database.org/db-info/SpecieSearch.html?taxon=${encodeURIComponent(sciName)}`, bg: 'bg-red-900 hover:bg-red-800' }, { label: '🐍 HerpMapper', url: `https://herpmapper.org/search?q=${encodeURIComponent(sciName)}`, bg: 'bg-rose-900 hover:bg-rose-800' });
+  if (taxon === 'Actinopterygii' || taxon === 'Animalia') extraSources.push({ label: '🐠 FishBase', url: `https://www.fishbase.se/search.php?q=${encodeURIComponent(sciName)}`, bg: 'bg-cyan-900 hover:bg-cyan-800' }, { label: '🌊 OBIS — Ocean Biodiversity', url: `https://obis.org/taxon/${sp.id}`, bg: 'bg-blue-900 hover:bg-blue-800' });
+  if (taxon === 'Plantae')   extraSources.push({ label: '🌺 Plants of the World (Kew)', url: `https://powo.science.kew.org/results?q=${encodeURIComponent(sciName)}`, bg: 'bg-green-900 hover:bg-green-800' }, { label: '🌾 USDA PLANTS Database', url: `https://plants.usda.gov/search?query=${encodeURIComponent(sciName)}`, bg: 'bg-lime-900 hover:bg-lime-800' });
+  if (taxon === 'Mammalia')  extraSources.push({ label: '🐆 IUCN Red List', url: `https://www.iucnredlist.org/search?query=${encodeURIComponent(sciName)}`, bg: 'bg-orange-900 hover:bg-orange-800' }, { label: '🐘 Wildscreen Arkive', url: `https://www.wildscreen.org/species/${encodeURIComponent(name.replace(/ /g,'-'))}`, bg: 'bg-amber-900 hover:bg-amber-800' });
+  if (taxon === 'Arachnida') extraSources.push({ label: '🕷️ World Spider Catalog', url: `https://wsc.nmbe.ch/search?sSearch=${encodeURIComponent(sciName)}`, bg: 'bg-slate-800 hover:bg-slate-700' });
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
       <div className="relative bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        {img && <img src={img} alt={sp.name} className="w-full h-52 object-cover rounded-t-2xl" />}
+        {/* Hero image with YouTube overlay */}
+        <div className="relative">
+          {img && <img src={img} alt={sp.name} className="w-full h-52 object-cover rounded-t-2xl" />}
+          <a href={ytSearchUrl} target="_blank" rel="noopener noreferrer"
+            className="absolute bottom-3 right-3 flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-3 py-2 rounded-xl shadow-lg transition">
+            ▶ Watch on YouTube
+          </a>
+        </div>
+
         <div className="p-5 space-y-3">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <h2 className="text-xl font-extrabold text-white capitalize">{sp.preferred_common_name || sp.name}</h2>
-              <p className="text-sm italic text-zinc-400">{sp.name}</p>
+              <h2 className="text-xl font-extrabold text-white capitalize">{name}</h2>
+              <p className="text-sm italic text-zinc-400">{sciName}</p>
             </div>
             <span className="text-xs font-bold px-2 py-1 rounded-full shrink-0" style={{ background: statusColor + '22', color: statusColor, border: `1px solid ${statusColor}55` }}>{status}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 text-xs text-zinc-400">
-            <div className="bg-zinc-800 rounded-lg p-2"><span className="text-zinc-500">Observations</span><p className="font-bold text-white">{obs}</p></div>
-            <div className="bg-zinc-800 rounded-lg p-2"><span className="text-zinc-500">Rank</span><p className="font-bold text-white capitalize">{sp.rank || 'species'}</p></div>
+
+          <div className="grid grid-cols-3 gap-2 text-xs text-zinc-400">
+            <div className="bg-zinc-800 rounded-lg p-2"><span className="text-zinc-500 block">Observations</span><p className="font-bold text-white">{obs}</p></div>
+            <div className="bg-zinc-800 rounded-lg p-2"><span className="text-zinc-500 block">Rank</span><p className="font-bold text-white capitalize">{sp.rank || 'species'}</p></div>
+            <div className="bg-zinc-800 rounded-lg p-2"><span className="text-zinc-500 block">Group</span><p className="font-bold text-white capitalize">{taxon || '—'}</p></div>
           </div>
+
           {sp.wikipedia_summary && <p className="text-sm text-zinc-400 leading-relaxed">{sp.wikipedia_summary}</p>}
+
+          {/* Core sources — all species */}
           <div className="flex flex-col gap-2 pt-1">
-            {wikiUrl && <a href={wikiUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition">📖 Wikipedia — Full Species Article</a>}
-            <a href={inatUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition">🌍 iNaturalist — Global Sightings & Photos</a>
-            <a href={`https://www.gbif.org/species/search?q=${encodeURIComponent(sp.name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-semibold rounded-xl transition">🔬 GBIF — Scientific Occurrence Data</a>
-            {sp.iconic_taxon_name === 'Plantae' && <a href={`https://www.worldfloraonline.org/search?query=${encodeURIComponent(sp.name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-green-900 hover:bg-green-800 text-white text-sm font-semibold rounded-xl transition">🌺 World Flora Online</a>}
-            <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent((sp.preferred_common_name || sp.name) + ' identification foraging survival')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition">▶️ YouTube — Identification & Survival Videos</a>
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Core Sources</p>
+            {wikiUrl && <a href={wikiUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-blue-700 hover:bg-blue-600 text-white text-sm font-semibold rounded-xl transition">📖 Wikipedia — Full Species Article</a>}
+            <a href={inatUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition">🌍 iNaturalist — Sightings & Photos</a>
+            <a href={`https://www.gbif.org/species/search?q=${encodeURIComponent(sciName)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-semibold rounded-xl transition">🔬 GBIF — Scientific Occurrence Data</a>
+            <a href={`https://eol.org/search?q=${encodeURIComponent(sciName)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-indigo-800 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition">🌐 Encyclopedia of Life</a>
+            <a href={`https://www.itis.gov/servlet/SingleRpt/SingleRpt?search_topic=Scientific_Name&search_value=${encodeURIComponent(sciName)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white text-sm font-semibold rounded-xl transition">🏛️ ITIS — Taxonomic Information</a>
+            <a href={`https://animaldiversity.org/search/?q=${encodeURIComponent(sciName)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-stone-700 hover:bg-stone-600 text-white text-sm font-semibold rounded-xl transition">🦎 Animal Diversity Web (ADW)</a>
+            <a href={`https://www.britannica.com/search?query=${encodeURIComponent(name)}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-semibold rounded-xl transition">📚 Britannica — Natural Sciences</a>
           </div>
+
+          {/* Category-specific sources */}
+          {extraSources.length > 0 && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Specialist Sources</p>
+              {extraSources.map((s, i) => (
+                <a key={i} href={s.url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2 px-4 py-2.5 text-white text-sm font-semibold rounded-xl transition ${s.bg}`}>{s.label}</a>
+              ))}
+            </div>
+          )}
+
+          {/* Video links */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Video</p>
+            <a href={ytSearchUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-red-700 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition">▶️ YouTube — Species Videos</a>
+            <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' documentary nature')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-red-900 hover:bg-red-800 text-white text-sm font-semibold rounded-xl transition">🎬 YouTube — Nature Documentaries</a>
+          </div>
+
           <button onClick={onClose} className="w-full mt-2 py-2 text-sm text-zinc-500 hover:text-zinc-300 transition">Close</button>
         </div>
       </div>
@@ -1063,47 +1118,96 @@ function SpeciesModal({ sp, onClose }) {
 
 function LibraryPage() {
   const [category, setCategory] = useState('Plantae');
-  const [species, setSpecies] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [species, setSpecies]   = useState([]);
+  const [loading, setLoading]   = useState(false);
   const [selected, setSelected] = useState(null);
-  const [query, setQuery] = useState('');
-  const [searching, setSearching] = useState(false);
+  const [query, setQuery]       = useState('');
   const [isSearchMode, setIsSearchMode] = useState(false);
+  const debounceRef  = useRef(null);
+  const abortRef     = useRef(null);  // cancel in-flight requests on category switch
+  const categoryRef  = useRef('Plantae'); // always current — avoids stale closure in debounce
   const catInfo = LIB_CATS.find(c => c.id === category) || LIB_CATS[0];
 
-  const loadCategory = async (cat) => {
-    setCategory(cat); setIsSearchMode(false); setQuery(''); setLoading(true); setSpecies([]);
+  const loadCategory = async (catId) => {
+    const cat = LIB_CATS.find(c => c.id === catId);
+    if (!cat) return;
+    categoryRef.current = catId;
+    setCategory(catId); setIsSearchMode(false); setQuery(''); setLoading(true); setSpecies([]);
+
+    // Cancel any previous in-flight request to prevent race conditions
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+
     try {
-      const r = await fetch(`https://api.inaturalist.org/v1/taxa?iconic_taxa=${cat}&rank=species&per_page=48&order_by=observations_count&order=desc&photos=true`);
+      // Use observations/species_counts with taxonId — this is the correct iNaturalist approach
+      // that guarantees Reptilia returns ONLY reptiles, Aves returns ONLY birds, etc.
+      const r = await fetch(
+        `https://api.inaturalist.org/v1/observations/species_counts?taxon_id=${cat.taxonId}&photos=true&quality_grade=research&per_page=48&order=desc&order_by=count`,
+        { signal: ctrl.signal }
+      );
       const d = await r.json();
-      setSpecies((d.results || []).filter(s => s.default_photo?.medium_url));
-    } catch {} finally { setLoading(false); }
+      // species_counts wraps each species in { count, taxon }
+      const list = (d.results || []).map(item => item.taxon).filter(s => s?.default_photo?.medium_url);
+      if (!ctrl.signal.aborted) setSpecies(list);
+    } catch (e) {
+      if (e.name !== 'AbortError') setSpecies([]);
+    } finally {
+      if (!ctrl.signal.aborted) setLoading(false);
+    }
   };
 
-  const search = async e => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    setSearching(true); setIsSearchMode(true); setSpecies([]);
+  const doSearch = async (q, catId) => {
+    if (!q.trim()) { loadCategory(catId); return; }
+    const cat = LIB_CATS.find(c => c.id === catId);
+    if (!cat) return;
+
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setLoading(true); setIsSearchMode(true); setSpecies([]);
+
     try {
-      const r = await fetch(`https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(query)}&rank=species&per_page=48&photos=true&order_by=observations_count&order=desc`);
+      // ancestor_id scopes the text search to descendants of that taxon — birds in birds, reptiles in reptiles
+      const r = await fetch(
+        `https://api.inaturalist.org/v1/taxa?q=${encodeURIComponent(q)}&ancestor_id=${cat.taxonId}&rank=species&per_page=48&photos=true&order_by=observations_count&order=desc`,
+        { signal: ctrl.signal }
+      );
       const d = await r.json();
-      setSpecies((d.results || []).filter(s => s.default_photo?.medium_url));
-    } catch {} finally { setSearching(false); }
+      if (!ctrl.signal.aborted) setSpecies((d.results || []).filter(s => s.default_photo?.medium_url));
+    } catch (e) {
+      if (e.name !== 'AbortError') setSpecies([]);
+    } finally {
+      if (!ctrl.signal.aborted) setLoading(false);
+    }
+  };
+
+  const handleInput = e => {
+    const val = e.target.value;
+    setQuery(val);
+    clearTimeout(debounceRef.current);
+    // Use categoryRef.current so debounce always uses latest category, not stale closure
+    debounceRef.current = setTimeout(() => doSearch(val, categoryRef.current), 300);
   };
 
   useEffect(() => { loadCategory('Plantae'); }, []);
+  useEffect(() => () => { clearTimeout(debounceRef.current); abortRef.current?.abort(); }, []);
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 pb-28">
       <h1 className="text-2xl font-extrabold text-white mb-2">Species Library</h1>
-      <p className="text-sm text-zinc-500 mb-5">Browse {isSearchMode ? 'search results' : `top ${catInfo.label.toLowerCase()} species`} — click any for Wikipedia, iNaturalist & YouTube links</p>
+      <p className="text-sm text-zinc-500 mb-5">
+        {isSearchMode
+          ? `Showing ${catInfo.label} matching "${query}"`
+          : `Top ${catInfo.label.toLowerCase()} species — click any for 10+ data sources & video`}
+      </p>
 
       {/* Category tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
         {LIB_CATS.map(cat => (
           <button key={cat.id} onClick={() => loadCategory(cat.id)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition border"
-            style={category === cat.id && !isSearchMode
+            style={category === cat.id
               ? { background: cat.color + '22', color: cat.color, borderColor: cat.color + '55' }
               : { background: '#18181b', color: '#a1a1aa', borderColor: '#3f3f46' }}>
             {cat.icon} {cat.label}
@@ -1111,18 +1215,24 @@ function LibraryPage() {
         ))}
       </div>
 
-      {/* Search */}
-      <form onSubmit={search} className="flex gap-2 mb-6">
-        <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search any species — grasshopper, moringa, king cobra…"
-          className="flex-1 px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-green-500" />
-        <button type="submit" disabled={searching} className="px-5 py-2.5 bg-green-600 hover:bg-green-500 text-white text-sm font-bold rounded-xl transition">
-          {searching ? '…' : 'Search'}
-        </button>
-        {isSearchMode && <button type="button" onClick={() => loadCategory(category)} className="px-3 py-2.5 bg-zinc-800 text-zinc-400 text-sm rounded-xl">✕</button>}
-      </form>
+      {/* Instant search — stays within active category */}
+      <div className="flex gap-2 mb-6">
+        <div className="relative flex-1">
+          <input
+            value={query}
+            onChange={handleInput}
+            placeholder={`Search ${catInfo.label.toLowerCase()} — type to search instantly…`}
+            className="w-full px-4 py-2.5 bg-zinc-900 border border-zinc-700 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-violet-500 pr-8"
+          />
+          {loading && query && <span className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-violet-400 border-t-transparent rounded-full animate-spin"/>}
+        </div>
+        {(isSearchMode || query) && (
+          <button onClick={() => { setQuery(''); loadCategory(category); }} className="px-3 py-2.5 bg-zinc-800 text-zinc-400 text-sm rounded-xl hover:text-white">✕</button>
+        )}
+      </div>
 
       {/* Grid */}
-      {loading || searching ? (
+      {loading ? (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
           {Array.from({ length: 24 }).map((_, i) => (
             <div key={i} className="aspect-square rounded-xl bg-zinc-800 animate-pulse" />
@@ -1306,8 +1416,9 @@ function SurvivalPage({ onNav }) {
 
 // ── Map Page ──────────────────────────────────────────────────
 const DISASTER_LAYERS = [
-  { id: 'quakes',   label: 'Earthquakes',   icon: '🔴', color: '#ef4444' },
+  { id: 'quakes',   label: 'Earthquakes',    icon: '🔴', color: '#ef4444' },
   { id: 'gdacs',    label: 'Floods/Storms',  icon: '🌊', color: '#3b82f6' },
+  { id: 'fires',    label: 'Active Fires',   icon: '🔥', color: '#f97316' },
   { id: 'weather',  label: 'Weather Alerts', icon: '⛈️', color: '#f59e0b' },
   { id: 'relief',   label: 'Active Disasters',icon: '🆘', color: '#a855f7' },
 ];
@@ -1322,8 +1433,8 @@ function MapPage() {
   const [filter, setFilter]         = useState('all');
   const [loading, setLoading]       = useState(true);
   const [satellite, setSatellite]   = useState(false);
-  const [layers, setLayers]         = useState({ quakes: false, gdacs: false, weather: false, relief: false });
-  const [disasters, setDisasters]   = useState({ quakes: [], gdacs: [], weather: [], relief: [] });
+  const [layers, setLayers]         = useState({ quakes: false, gdacs: false, fires: false, weather: false, relief: false });
+  const [disasters, setDisasters]   = useState({ quakes: [], gdacs: [], fires: [], weather: [], relief: [] });
   const [loadingDis, setLoadingDis] = useState({});
   const [disPanel, setDisPanel]     = useState(null);
 
@@ -1340,6 +1451,7 @@ function MapPage() {
         let url = '';
         if (id === 'quakes') url = 'https://earthquake.usgs.gov/fdsnws/event/1/query?format=geojson&minmagnitude=4.5&limit=150&orderby=time';
         if (id === 'gdacs')   url = `${API}/disasters/gdacs`;
+        if (id === 'fires')   url = `${API}/disasters/fires`;
         if (id === 'weather') url = `${API}/disasters/weather-alerts`;
         if (id === 'relief')  url = `${API}/disasters/reliefweb`;
         const r = await fetch(url); const d = await r.json();
@@ -1362,11 +1474,11 @@ function MapPage() {
       if (!mapRef.current || typeof window.L === 'undefined') return;
       if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; }
       const map = window.L.map(mapRef.current, { center: [20, 0], zoom: 2, zoomControl: true });
-      const osmTile  = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+      const darkTile = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
       const esriTile = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
-      const tileUrl  = satellite ? esriTile : osmTile;
-      const tileAttr = satellite ? 'Tiles © Esri — USGS, NOAA' : '© OpenStreetMap';
-      tileLayerRef.current = window.L.tileLayer(tileUrl, { attribution: tileAttr }).addTo(map);
+      const tileUrl  = satellite ? esriTile : darkTile;
+      const tileAttr = satellite ? 'Tiles © Esri — USGS, NOAA' : '© OpenStreetMap contributors © CARTO';
+      tileLayerRef.current = window.L.tileLayer(tileUrl, { attribution: tileAttr, subdomains: 'abcd', maxZoom: 19 }).addTo(map);
       const colorMap = { plant: '#22c55e', insect: '#f59e0b', bird: '#3b82f6', mushroom: '#8b5cf6', reptile: '#ef4444', marine: '#06b6d4', survival: '#f97316' };
       const filtered = filter === 'all' ? sightings : sightings.filter(s => s.scan_mode === filter);
       filtered.forEach(s => {
@@ -1374,7 +1486,7 @@ function MapPage() {
         const color = colorMap[s.scan_mode] || '#6b7280';
         window.L.circleMarker([s.latitude, s.longitude], { radius: 6, fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.85 })
           .addTo(map)
-          .bindPopup(`<b>${s.common_name || 'Unknown'}</b><br><i>${s.scientific_name || ''}</i><br><small>${s.country || ''}</small>`);
+          .bindPopup(`<b>${escHtml(s.common_name || 'Unknown')}</b><br><i>${escHtml(s.scientific_name || '')}</i><br><small>${escHtml(s.country || '')}</small>`);
       });
 
       // Earthquake overlay
@@ -1385,7 +1497,19 @@ function MapPage() {
           const color = mag >= 7 ? '#7f1d1d' : mag >= 6 ? '#ef4444' : '#f87171';
           window.L.circleMarker([lat, lng], { radius: Math.max(5, mag * 3), fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.8 })
             .addTo(map)
-            .bindPopup(`<b>🔴 M${mag} Earthquake</b><br>${eq.properties.place}<br><small>${new Date(eq.properties.time).toLocaleString()}</small>`);
+            .bindPopup(`<b>🔴 M${escHtml(String(mag))} Earthquake</b><br>${escHtml(eq.properties.place)}<br><small>${escHtml(new Date(eq.properties.time).toLocaleString())}</small>`);
+        });
+      }
+
+      // NASA FIRMS real-time fire overlay
+      if (layers.fires) {
+        disasters.fires.forEach(f => {
+          const intensity = Math.min(Math.max(f.frp / 100, 0.4), 1);
+          const radius = Math.max(3, Math.min(8, f.frp / 30 + 3));
+          window.L.circleMarker([f.lat, f.lng], {
+            radius, fillColor: '#f97316', color: '#fbbf24', weight: 1, fillOpacity: intensity,
+          }).addTo(map)
+            .bindPopup(`<b>🔥 Active Fire</b><br>${escHtml(f.date || '')} ${escHtml(f.time || '')}<br><small>FRP: ${f.frp} MW · ${escHtml(f.confidence || '')} confidence · ${escHtml(f.satellite || '')}</small>`);
         });
       }
 
@@ -1397,7 +1521,7 @@ function MapPage() {
           const icon = ev.type === 'tc' ? '🌀' : ev.type === 'fl' ? '🌊' : ev.type === 'vo' ? '🌋' : ev.type === 'wf' ? '🔥' : ev.type === 'dr' ? '🏜️' : '⚠️';
           window.L.circleMarker([ev.lat, ev.lng], { radius: 10, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.85 })
             .addTo(map)
-            .bindPopup(`<b>${icon} ${ev.name || ev.type?.toUpperCase()}</b><br>${ev.country || ''}<br><span style="color:${ev.alert==='red'?'#ef4444':ev.alert==='orange'?'#f97316':'#22c55e'}">${(ev.alert||'').toUpperCase()} ALERT</span><br><small>${ev.description || ''}</small>`);
+            .bindPopup(`<b>${icon} ${escHtml(ev.name || ev.type?.toUpperCase() || '')}</b><br>${escHtml(ev.country || '')}<br><span style="color:${ev.alert==='red'?'#ef4444':ev.alert==='orange'?'#f97316':'#22c55e'}">${escHtml((ev.alert||'').toUpperCase())} ALERT</span><br><small>${escHtml(ev.description || '')}</small>`);
         });
       }
 
@@ -1539,6 +1663,65 @@ function MapPage() {
           </div>
         </div>
       )}
+
+      <NewsPanel />
+    </div>
+  );
+}
+
+function NewsPanel() {
+  const [news, setNews]       = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [topic, setTopic]     = useState('wildlife');
+  const TOPICS = [
+    { id: 'wildlife',      label: '🦁 Wildlife' },
+    { id: 'environment',   label: '🌱 Environment' },
+    { id: 'disaster',      label: '🌪️ Disasters' },
+    { id: 'conservation',  label: '♻️ Conservation' },
+    { id: 'agriculture',   label: '🌾 Agriculture' },
+  ];
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`${API}/news?q=${encodeURIComponent(topic)}&limit=15`)
+      .then(r => r.json())
+      .then(d => setNews(Array.isArray(d.articles) ? d.articles : []))
+      .catch(() => setNews([]))
+      .finally(() => setLoading(false));
+  }, [topic]);
+
+  return (
+    <div className="mt-6 glass-card p-5">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h3 className="text-sm font-bold text-white">📰 Global News Feed</h3>
+        <div className="flex gap-1.5 flex-wrap">
+          {TOPICS.map(t => (
+            <button key={t.id} onClick={() => setTopic(t.id)}
+              className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${topic === t.id ? 'bg-violet-600 border-violet-500 text-white' : 'border-zinc-700 text-slate-400 hover:border-violet-600'}`}>
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {loading && <div className="space-y-2">{Array.from({length:5}).map((_,i)=><div key={i} className="h-12 bg-zinc-800 rounded-lg animate-pulse"/>)}</div>}
+      {!loading && news.length === 0 && <p className="text-zinc-500 text-sm">No news available right now.</p>}
+      <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+        {news.map((a, i) => (
+          <a key={i} href={a.url} target="_blank" rel="noopener noreferrer"
+            className="flex gap-3 items-start p-3 rounded-xl bg-zinc-900/60 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-600 transition group">
+            {a.image && <img src={a.image} alt="" className="w-16 h-12 object-cover rounded-lg flex-shrink-0 opacity-80 group-hover:opacity-100"/>}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold text-zinc-200 group-hover:text-white leading-snug line-clamp-2">{a.title}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] text-zinc-500">{a.source}</span>
+                {a.publishedAt && <span className="text-[10px] text-zinc-600">{new Date(a.publishedAt).toLocaleDateString()}</span>}
+              </div>
+            </div>
+            <span className="text-zinc-600 group-hover:text-violet-400 text-sm flex-shrink-0">↗</span>
+          </a>
+        ))}
+      </div>
+      <p className="text-[10px] text-zinc-600 mt-3 text-right">Powered by GDELT Project & NewsData</p>
     </div>
   );
 }
@@ -2693,6 +2876,734 @@ function RegionIntelResult({ intel, riskColor }) {
 
 
 
+// ── Farm Ops ──────────────────────────────────────────────────
+const FARM_OPS_API = `${API}/farm-ops`;
+
+const INV_CATEGORIES = ['seed', 'fertilizer', 'chemical', 'fuel', 'feed', 'parts'];
+const TASK_STATUSES  = ['pending', 'in_progress', 'done'];
+const TASK_PRIORITIES = ['low', 'medium', 'high'];
+const PLANT_STATUSES  = ['planned', 'planted', 'growing', 'harvested', 'failed'];
+
+function FarmAlert({ alerts }) {
+  if (!alerts?.length) return null;
+  return (
+    <div className="mb-6 space-y-2">
+      {alerts.map((a, i) => (
+        <div key={i} className={`flex items-start gap-3 px-4 py-3 rounded-xl text-sm border ${
+          a.severity === 'high'
+            ? 'bg-red-950/40 border-red-800/50 text-red-300'
+            : a.severity === 'medium'
+            ? 'bg-amber-950/40 border-amber-800/50 text-amber-300'
+            : 'bg-blue-950/40 border-blue-800/50 text-blue-300'
+        }`}>
+          <span>{a.severity === 'high' ? '🔴' : a.severity === 'medium' ? '🟡' : '🔵'}</span>
+          <span>{a.message}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FarmModal({ title, children, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="glass-card w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white text-xl">×</button>
+        <h3 className="text-lg font-bold text-white mb-5">{title}</h3>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function FarmOpsFields({ fields, setFields }) {
+  const [modal, setModal]   = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm]     = useState({ name: '', acreage: '', soil_type: '', last_soil_test: '', notes: '' });
+
+  const save = async e => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const r = await fetch(`${FARM_OPS_API}/fields`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      setFields(f => [d, ...f]);
+      setModal(false);
+      setForm({ name: '', acreage: '', soil_type: '', last_soil_test: '', notes: '' });
+    } catch { /* pass */ }
+    setSaving(false);
+  };
+
+  const del = async id => {
+    await fetch(`${FARM_OPS_API}/fields/${id}`, { method: 'DELETE', credentials: 'include' });
+    setFields(f => f.filter(x => x.id !== id));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-white">Fields</h2>
+        <button onClick={() => setModal(true)} className="btn-violet px-4 py-1.5 text-sm rounded-lg">+ Add Field</button>
+      </div>
+      {fields.length === 0 && <p className="text-slate-500 text-sm">No fields registered yet.</p>}
+      <div className="space-y-3">
+        {fields.map(f => (
+          <div key={f.id} className="glass-card px-4 py-3 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-white">{f.name}</p>
+              <p className="text-xs text-slate-400">{[f.acreage && `${f.acreage} acres`, f.soil_type].filter(Boolean).join(' · ')}</p>
+            </div>
+            <button onClick={() => del(f.id)} className="text-slate-600 hover:text-red-400 text-lg">×</button>
+          </div>
+        ))}
+      </div>
+      {modal && (
+        <FarmModal title="Register Field" onClose={() => setModal(false)}>
+          <form onSubmit={save} className="space-y-3">
+            {[['name','Field Name *','text',true],['acreage','Acreage','number'],['soil_type','Soil Type','text'],['last_soil_test','Last Soil Test','date']].map(([k,label,type,req])=>(
+              <div key={k}>
+                <label className="block text-xs text-slate-400 mb-1">{label}</label>
+                <input required={!!req} type={type||'text'} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none"/>
+              </div>
+            ))}
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Notes</label>
+              <textarea rows={2} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))}
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none"/>
+            </div>
+            <button type="submit" disabled={saving} className="btn-violet w-full py-2 text-sm rounded-lg">
+              {saving ? 'Saving…' : 'Save Field'}
+            </button>
+          </form>
+        </FarmModal>
+      )}
+    </div>
+  );
+}
+
+function FarmOpsPlanting({ fields }) {
+  const [plantings, setPlantings] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [modal, setModal]         = useState(false);
+  const [saving, setSaving]       = useState(false);
+  const [form, setForm] = useState({
+    field_id: '', crop_name: '', variety: '', seed_lot: '', season: '',
+    planned_date: '', actual_date: '', seed_rate: '', days_to_maturity: '',
+    target_yield_kg: '', status: 'planned', crop_family: '', notes: '',
+  });
+
+  useEffect(() => {
+    fetch(`${FARM_OPS_API}/plantings`, { credentials: 'include' })
+      .then(r => r.json()).then(d => setPlantings(Array.isArray(d) ? d : []))
+      .catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const save = async e => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const r = await fetch(`${FARM_OPS_API}/plantings`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, field_id: form.field_id || null }),
+      });
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      setPlantings(p => [d, ...p]);
+      setModal(false);
+    } catch { /* pass */ }
+    setSaving(false);
+  };
+
+  const del = async id => {
+    await fetch(`${FARM_OPS_API}/plantings/${id}`, { method: 'DELETE', credentials: 'include' });
+    setPlantings(p => p.filter(x => x.id !== id));
+  };
+
+  const statusColor = s => ({ planted:'text-green-400', growing:'text-teal-400', harvested:'text-blue-400', failed:'text-red-400' })[s] || 'text-slate-400';
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-white">Planting Schedule</h2>
+        <button onClick={() => setModal(true)} className="btn-violet px-4 py-1.5 text-sm rounded-lg">+ Add Planting</button>
+      </div>
+      {loading && <p className="text-slate-500 text-sm">Loading…</p>}
+      {!loading && plantings.length === 0 && <p className="text-slate-500 text-sm">No plantings logged yet.</p>}
+      <div className="space-y-3">
+        {plantings.map(p => (
+          <div key={p.id} className="glass-card px-4 py-3 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="font-semibold text-white">{p.crop_name}</p>
+                {p.variety && <span className="text-xs text-slate-400">{p.variety}</span>}
+                <span className={`text-xs font-medium ${statusColor(p.status)}`}>{p.status}</span>
+                {p.rotation_warning && <span className="text-xs text-amber-400">⚠ {p.rotation_warning}</span>}
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {[p.field_name && `Field: ${p.field_name}`, p.planned_date && `Planned: ${new Date(p.planned_date).toLocaleDateString()}`, p.season].filter(Boolean).join(' · ')}
+              </p>
+            </div>
+            <button onClick={() => del(p.id)} className="text-slate-600 hover:text-red-400 text-lg flex-shrink-0">×</button>
+          </div>
+        ))}
+      </div>
+      {modal && (
+        <FarmModal title="Log Planting" onClose={() => setModal(false)}>
+          <form onSubmit={save} className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Field</label>
+              <select value={form.field_id} onChange={e=>setForm(f=>({...f,field_id:e.target.value}))}
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none">
+                <option value="">— none —</option>
+                {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </div>
+            {[['crop_name','Crop Name *','text',true],['variety','Variety','text'],['seed_lot','Seed Lot','text'],['season','Season (e.g. 2026-Q2)','text'],['crop_family','Crop Family (for rotation check)','text'],['planned_date','Planned Date','date'],['actual_date','Actual Date','date'],['seed_rate','Seed Rate (kg/acre)','number'],['days_to_maturity','Days to Maturity','number'],['target_yield_kg','Target Yield (kg)','number']].map(([k,label,type,req])=>(
+              <div key={k}>
+                <label className="block text-xs text-slate-400 mb-1">{label}</label>
+                <input required={!!req} type={type} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none"/>
+              </div>
+            ))}
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Status</label>
+              <select value={form.status} onChange={e=>setForm(f=>({...f,status:e.target.value}))}
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none">
+                {PLANT_STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <button type="submit" disabled={saving} className="btn-violet w-full py-2 text-sm rounded-lg">
+              {saving ? 'Saving…' : 'Log Planting'}
+            </button>
+          </form>
+        </FarmModal>
+      )}
+    </div>
+  );
+}
+
+function FarmOpsInventory() {
+  const [items, setItems]   = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal]   = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [catFilter, setCatFilter] = useState('all');
+  const [form, setForm] = useState({
+    category: 'seed', name: '', quantity: '', unit: '', reorder_point: '',
+    daily_usage: '', lead_time_days: '', preferred_supplier: '', last_price_usd: '',
+    expiry_date: '', notes: '',
+  });
+
+  const load = () => {
+    setLoading(true);
+    Promise.all([
+      fetch(`${FARM_OPS_API}/inventory`, { credentials: 'include' }).then(r => r.json()),
+      fetch(`${FARM_OPS_API}/inventory/alerts`, { credentials: 'include' }).then(r => r.json()),
+    ]).then(([inv, al]) => { setItems(Array.isArray(inv) ? inv : []); setAlerts(Array.isArray(al) ? al : []); })
+      .catch(() => {}).finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
+
+  const save = async e => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const r = await fetch(`${FARM_OPS_API}/inventory`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      setItems(i => [d, ...i]);
+      setModal(false);
+    } catch { /* pass */ }
+    setSaving(false);
+  };
+
+  const del = async id => {
+    await fetch(`${FARM_OPS_API}/inventory/${id}`, { method: 'DELETE', credentials: 'include' });
+    setItems(i => i.filter(x => x.id !== id));
+  };
+
+  const visible = catFilter === 'all' ? items : items.filter(i => i.category === catFilter);
+  const alertIds = new Set(alerts.map(a => a.id));
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h2 className="text-lg font-bold text-white">Inventory</h2>
+        <button onClick={() => setModal(true)} className="btn-violet px-4 py-1.5 text-sm rounded-lg">+ Add Item</button>
+      </div>
+      {alerts.length > 0 && (
+        <div className="mb-4 p-3 rounded-xl bg-amber-950/40 border border-amber-800/50">
+          <p className="text-xs font-bold text-amber-400 mb-1">LOW STOCK ({alerts.length})</p>
+          {alerts.map(a => <p key={a.id} className="text-xs text-amber-300">{a.name} — {a.quantity} {a.unit || 'units'} (reorder at {a.reorder_point})</p>)}
+        </div>
+      )}
+      <div className="flex gap-2 flex-wrap mb-4">
+        {['all', ...INV_CATEGORIES].map(c => (
+          <button key={c} onClick={() => setCatFilter(c)}
+            className={`px-3 py-1 text-xs rounded-full border transition-colors ${catFilter === c ? 'bg-violet-600 border-violet-500 text-white' : 'border-zinc-700 text-slate-400 hover:border-violet-600'}`}>
+            {c}
+          </button>
+        ))}
+      </div>
+      {loading && <p className="text-slate-500 text-sm">Loading…</p>}
+      {!loading && visible.length === 0 && <p className="text-slate-500 text-sm">No items in this category.</p>}
+      <div className="space-y-2">
+        {visible.map(item => (
+          <div key={item.id} className={`glass-card px-4 py-3 flex items-center justify-between gap-4 ${alertIds.has(item.id) ? 'border-amber-800/60' : ''}`}>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-slate-400">{item.category}</span>
+                <p className="font-medium text-white text-sm">{item.name}</p>
+                {alertIds.has(item.id) && <span className="text-xs text-amber-400">⚠ low</span>}
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                {item.quantity} {item.unit || 'units'}{item.preferred_supplier ? ` · ${item.preferred_supplier}` : ''}
+              </p>
+            </div>
+            <button onClick={() => del(item.id)} className="text-slate-600 hover:text-red-400 text-lg flex-shrink-0">×</button>
+          </div>
+        ))}
+      </div>
+      {modal && (
+        <FarmModal title="Add Inventory Item" onClose={() => setModal(false)}>
+          <form onSubmit={save} className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Category</label>
+              <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none">
+                {INV_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            {[['name','Item Name *','text',true],['quantity','Current Quantity','number'],['unit','Unit (kg, L, bags…)','text'],['reorder_point','Reorder Point','number'],['daily_usage','Daily Usage','number'],['lead_time_days','Lead Time (days)','number'],['preferred_supplier','Preferred Supplier','text'],['last_price_usd','Last Price (USD)','number'],['expiry_date','Expiry Date','date']].map(([k,label,type,req])=>(
+              <div key={k}>
+                <label className="block text-xs text-slate-400 mb-1">{label}</label>
+                <input required={!!req} type={type} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none"/>
+              </div>
+            ))}
+            <button type="submit" disabled={saving} className="btn-violet w-full py-2 text-sm rounded-lg">
+              {saving ? 'Saving…' : 'Add Item'}
+            </button>
+          </form>
+        </FarmModal>
+      )}
+    </div>
+  );
+}
+
+function FarmOpsEquipment() {
+  const [equipment, setEquipment] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [modal, setModal]         = useState(false);
+  const [logModal, setLogModal]   = useState(null);
+  const [saving, setSaving]       = useState(false);
+  const [form, setForm] = useState({ name: '', make_model: '', hours_current: '', service_interval_hrs: '', next_service_date: '', insurance_renewal: '', notes: '' });
+  const [logForm, setLogForm] = useState({ log_type: 'maintenance', description: '', hours_at_service: '', cost_usd: '', downtime_hrs: '' });
+
+  useEffect(() => {
+    fetch(`${FARM_OPS_API}/equipment`, { credentials: 'include' })
+      .then(r => r.json()).then(d => setEquipment(Array.isArray(d) ? d : []))
+      .catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const save = async e => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const r = await fetch(`${FARM_OPS_API}/equipment`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      setEquipment(eq => [d, ...eq]);
+      setModal(false);
+    } catch { /* pass */ }
+    setSaving(false);
+  };
+
+  const saveLog = async e => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const r = await fetch(`${FARM_OPS_API}/equipment/${logModal}/log`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logForm),
+      });
+      if (r.ok) { setLogModal(null); setLogForm({ log_type: 'maintenance', description: '', hours_at_service: '', cost_usd: '', downtime_hrs: '' }); }
+    } catch { /* pass */ }
+    setSaving(false);
+  };
+
+  const del = async id => {
+    await fetch(`${FARM_OPS_API}/equipment/${id}`, { method: 'DELETE', credentials: 'include' });
+    setEquipment(eq => eq.filter(x => x.id !== id));
+  };
+
+  const serviceStatus = eq => {
+    if (!eq.next_service_date) return null;
+    const days = Math.ceil((new Date(eq.next_service_date) - Date.now()) / 86400000);
+    if (days < 0)  return { label: `Overdue ${Math.abs(days)}d`, cls: 'text-red-400' };
+    if (days <= 7) return { label: `Due in ${days}d`, cls: 'text-amber-400' };
+    return { label: `Due in ${days}d`, cls: 'text-slate-400' };
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-white">Equipment</h2>
+        <button onClick={() => setModal(true)} className="btn-violet px-4 py-1.5 text-sm rounded-lg">+ Add Equipment</button>
+      </div>
+      {loading && <p className="text-slate-500 text-sm">Loading…</p>}
+      {!loading && equipment.length === 0 && <p className="text-slate-500 text-sm">No equipment registered.</p>}
+      <div className="space-y-3">
+        {equipment.map(eq => {
+          const svc = serviceStatus(eq);
+          return (
+            <div key={eq.id} className="glass-card px-4 py-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-semibold text-white">{eq.name}</p>
+                  <p className="text-xs text-slate-400">{[eq.make_model, eq.hours_current != null && `${eq.hours_current}h`].filter(Boolean).join(' · ')}</p>
+                  {svc && <p className={`text-xs font-medium mt-0.5 ${svc.cls}`}>{svc.label}</p>}
+                </div>
+                <div className="flex gap-2 flex-shrink-0">
+                  <button onClick={() => setLogModal(eq.id)} className="text-xs text-violet-400 hover:text-violet-300 border border-violet-800 rounded px-2 py-1">Log Service</button>
+                  <button onClick={() => del(eq.id)} className="text-slate-600 hover:text-red-400 text-lg">×</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {modal && (
+        <FarmModal title="Register Equipment" onClose={() => setModal(false)}>
+          <form onSubmit={save} className="space-y-3">
+            {[['name','Equipment Name *','text',true],['make_model','Make / Model','text'],['hours_current','Current Hours','number'],['service_interval_hrs','Service Interval (hrs)','number'],['next_service_date','Next Service Date','date'],['insurance_renewal','Insurance Renewal','date']].map(([k,label,type,req])=>(
+              <div key={k}>
+                <label className="block text-xs text-slate-400 mb-1">{label}</label>
+                <input required={!!req} type={type} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none"/>
+              </div>
+            ))}
+            <button type="submit" disabled={saving} className="btn-violet w-full py-2 text-sm rounded-lg">
+              {saving ? 'Saving…' : 'Register'}
+            </button>
+          </form>
+        </FarmModal>
+      )}
+      {logModal && (
+        <FarmModal title="Log Service / Repair" onClose={() => setLogModal(null)}>
+          <form onSubmit={saveLog} className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Type</label>
+              <select value={logForm.log_type} onChange={e=>setLogForm(f=>({...f,log_type:e.target.value}))}
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none">
+                {['maintenance','repair','inspection'].map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            {[['description','Description','text'],['hours_at_service','Hours at Service','number'],['cost_usd','Cost (USD)','number'],['downtime_hrs','Downtime (hrs)','number']].map(([k,label,type])=>(
+              <div key={k}>
+                <label className="block text-xs text-slate-400 mb-1">{label}</label>
+                <input type={type} value={logForm[k]} onChange={e=>setLogForm(f=>({...f,[k]:e.target.value}))}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none"/>
+              </div>
+            ))}
+            <button type="submit" disabled={saving} className="btn-violet w-full py-2 text-sm rounded-lg">
+              {saving ? 'Saving…' : 'Save Log'}
+            </button>
+          </form>
+        </FarmModal>
+      )}
+    </div>
+  );
+}
+
+function FarmOpsTasks({ fields }) {
+  const [tasks, setTasks]   = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal]   = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [filter, setFilter] = useState('pending');
+  const [form, setForm] = useState({ field_id: '', title: '', description: '', due_date: '', assigned_to: '', status: 'pending', priority: 'medium', est_hours: '' });
+
+  const load = () => {
+    setLoading(true);
+    fetch(`${FARM_OPS_API}/tasks`, { credentials: 'include' })
+      .then(r => r.json()).then(d => setTasks(Array.isArray(d) ? d : []))
+      .catch(() => {}).finally(() => setLoading(false));
+  };
+
+  useEffect(load, []);
+
+  const save = async e => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const r = await fetch(`${FARM_OPS_API}/tasks`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, field_id: form.field_id || null }),
+      });
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      setTasks(t => [d, ...t]);
+      setModal(false);
+    } catch { /* pass */ }
+    setSaving(false);
+  };
+
+  const toggle = async (id, cur) => {
+    const next = cur === 'done' ? 'pending' : cur === 'pending' ? 'in_progress' : 'done';
+    const r = await fetch(`${FARM_OPS_API}/tasks/${id}`, {
+      method: 'PUT', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: next }),
+    }).then(x => x.json());
+    setTasks(t => t.map(x => x.id === id ? { ...x, status: next } : x));
+  };
+
+  const del = async id => {
+    await fetch(`${FARM_OPS_API}/tasks/${id}`, { method: 'DELETE', credentials: 'include' });
+    setTasks(t => t.filter(x => x.id !== id));
+  };
+
+  const visible = tasks.filter(t => filter === 'all' || t.status === filter);
+  const prioColor = p => ({ high: 'text-red-400', medium: 'text-amber-400', low: 'text-slate-400' })[p] || 'text-slate-400';
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h2 className="text-lg font-bold text-white">Tasks</h2>
+        <button onClick={() => setModal(true)} className="btn-violet px-4 py-1.5 text-sm rounded-lg">+ Add Task</button>
+      </div>
+      <div className="flex gap-2 flex-wrap mb-4">
+        {['all', ...TASK_STATUSES].map(s => (
+          <button key={s} onClick={() => setFilter(s)}
+            className={`px-3 py-1 text-xs rounded-full border transition-colors ${filter === s ? 'bg-violet-600 border-violet-500 text-white' : 'border-zinc-700 text-slate-400 hover:border-violet-600'}`}>
+            {s}
+          </button>
+        ))}
+      </div>
+      {loading && <p className="text-slate-500 text-sm">Loading…</p>}
+      {!loading && visible.length === 0 && <p className="text-slate-500 text-sm">No tasks in this category.</p>}
+      <div className="space-y-2">
+        {visible.map(t => (
+          <div key={t.id} className={`glass-card px-4 py-3 flex items-start gap-3 ${t.status === 'done' ? 'opacity-60' : ''}`}>
+            <button onClick={() => toggle(t.id, t.status)} className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 border-violet-600 flex items-center justify-center text-xs text-violet-400 hover:bg-violet-600/20">
+              {t.status === 'done' ? '✓' : t.status === 'in_progress' ? '…' : ''}
+            </button>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className={`font-medium text-sm ${t.status === 'done' ? 'line-through text-slate-500' : 'text-white'}`}>{t.title}</p>
+                <span className={`text-xs font-medium ${prioColor(t.priority)}`}>{t.priority}</span>
+              </div>
+              <p className="text-xs text-slate-400">{[t.field_name && `Field: ${t.field_name}`, t.assigned_to && `→ ${t.assigned_to}`, t.due_date && `Due: ${new Date(t.due_date).toLocaleDateString()}`].filter(Boolean).join(' · ')}</p>
+            </div>
+            <button onClick={() => del(t.id)} className="text-slate-600 hover:text-red-400 text-lg flex-shrink-0">×</button>
+          </div>
+        ))}
+      </div>
+      {modal && (
+        <FarmModal title="Add Task" onClose={() => setModal(false)}>
+          <form onSubmit={save} className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Field</label>
+              <select value={form.field_id} onChange={e=>setForm(f=>({...f,field_id:e.target.value}))}
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none">
+                <option value="">— none —</option>
+                {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </div>
+            {[['title','Task Title *','text',true],['assigned_to','Assigned To','text'],['due_date','Due Date','date'],['est_hours','Estimated Hours','number']].map(([k,label,type,req])=>(
+              <div key={k}>
+                <label className="block text-xs text-slate-400 mb-1">{label}</label>
+                <input required={!!req} type={type} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none"/>
+              </div>
+            ))}
+            <div className="grid grid-cols-2 gap-3">
+              {[['status','Status',TASK_STATUSES],['priority','Priority',TASK_PRIORITIES]].map(([k,label,opts])=>(
+                <div key={k}>
+                  <label className="block text-xs text-slate-400 mb-1">{label}</label>
+                  <select value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                    className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none">
+                    {opts.map(o=><option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Description</label>
+              <textarea rows={2} value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))}
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none"/>
+            </div>
+            <button type="submit" disabled={saving} className="btn-violet w-full py-2 text-sm rounded-lg">
+              {saving ? 'Saving…' : 'Add Task'}
+            </button>
+          </form>
+        </FarmModal>
+      )}
+    </div>
+  );
+}
+
+function FarmOpsHarvest({ fields }) {
+  const [harvests, setHarvests] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [modal, setModal]       = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [form, setForm] = useState({ field_id: '', crop_name: '', start_date: '', end_date: '', area_acres: '', yield_kg: '', moisture_pct: '', grade: '', storage_location: '', notes: '' });
+
+  useEffect(() => {
+    fetch(`${FARM_OPS_API}/harvests`, { credentials: 'include' })
+      .then(r => r.json()).then(d => setHarvests(Array.isArray(d) ? d : []))
+      .catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const save = async e => {
+    e.preventDefault(); setSaving(true);
+    try {
+      const r = await fetch(`${FARM_OPS_API}/harvests`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, field_id: form.field_id || null }),
+      });
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      setHarvests(h => [d, ...h]);
+      setModal(false);
+    } catch { /* pass */ }
+    setSaving(false);
+  };
+
+  const del = async id => {
+    await fetch(`${FARM_OPS_API}/harvests/${id}`, { method: 'DELETE', credentials: 'include' });
+    setHarvests(h => h.filter(x => x.id !== id));
+  };
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-white">Harvest Records</h2>
+        <button onClick={() => setModal(true)} className="btn-violet px-4 py-1.5 text-sm rounded-lg">+ Log Harvest</button>
+      </div>
+      {loading && <p className="text-slate-500 text-sm">Loading…</p>}
+      {!loading && harvests.length === 0 && <p className="text-slate-500 text-sm">No harvest records yet.</p>}
+      <div className="space-y-3">
+        {harvests.map(h => (
+          <div key={h.id} className="glass-card px-4 py-3 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="font-semibold text-white">{h.crop_name}</p>
+              <p className="text-xs text-slate-400">
+                {[h.field_name && `Field: ${h.field_name}`, h.yield_kg && `${h.yield_kg} kg`, h.area_acres && `${h.area_acres} acres`, h.start_date && new Date(h.start_date).toLocaleDateString()].filter(Boolean).join(' · ')}
+              </p>
+              {h.storage_location && <p className="text-xs text-teal-400 mt-0.5">Storage: {h.storage_location}</p>}
+            </div>
+            <button onClick={() => del(h.id)} className="text-slate-600 hover:text-red-400 text-lg flex-shrink-0">×</button>
+          </div>
+        ))}
+      </div>
+      {modal && (
+        <FarmModal title="Log Harvest" onClose={() => setModal(false)}>
+          <form onSubmit={save} className="space-y-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Field</label>
+              <select value={form.field_id} onChange={e=>setForm(f=>({...f,field_id:e.target.value}))}
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none">
+                <option value="">— none —</option>
+                {fields.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+            </div>
+            {[['crop_name','Crop Name *','text',true],['start_date','Start Date','date'],['end_date','End Date','date'],['area_acres','Area (acres)','number'],['yield_kg','Yield (kg)','number'],['moisture_pct','Moisture %','number'],['grade','Grade','text'],['storage_location','Storage Location','text']].map(([k,label,type,req])=>(
+              <div key={k}>
+                <label className="block text-xs text-slate-400 mb-1">{label}</label>
+                <input required={!!req} type={type} value={form[k]} onChange={e=>setForm(f=>({...f,[k]:e.target.value}))}
+                  className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:border-violet-500 outline-none"/>
+              </div>
+            ))}
+            <button type="submit" disabled={saving} className="btn-violet w-full py-2 text-sm rounded-lg">
+              {saving ? 'Saving…' : 'Log Harvest'}
+            </button>
+          </form>
+        </FarmModal>
+      )}
+    </div>
+  );
+}
+
+function FarmOpsPage() {
+  const { user } = useAuth();
+  const [tab, setTab]         = useState('fields');
+  const [fields, setFields]   = useState([]);
+  const [hbAlerts, setHbAlerts] = useState([]);
+  const [hbLoaded, setHbLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch(`${FARM_OPS_API}/fields`, { credentials: 'include' })
+      .then(r => r.json()).then(d => setFields(Array.isArray(d) ? d : [])).catch(() => {});
+    fetch(`${FARM_OPS_API}/heartbeat`, { credentials: 'include' })
+      .then(r => r.json()).then(d => { setHbAlerts(d.alerts || []); setHbLoaded(true); }).catch(() => {});
+  }, [user]);
+
+  if (!user) return (
+    <div className="max-w-lg mx-auto px-4 py-16 text-center">
+      <p className="text-slate-500">Sign in to use Farm Operations.</p>
+    </div>
+  );
+
+  const TABS = [
+    { id: 'fields',    label: 'Fields',    icon: '🗺️' },
+    { id: 'planting',  label: 'Planting',  icon: '🌱' },
+    { id: 'inventory', label: 'Inventory', icon: '📦' },
+    { id: 'equipment', label: 'Equipment', icon: '🚜' },
+    { id: 'tasks',     label: 'Tasks',     icon: '✅' },
+    { id: 'harvest',   label: 'Harvest',   icon: '🌾' },
+  ];
+
+  return (
+    <div className="max-w-3xl mx-auto px-4 py-8 pb-28">
+      <div className="flex items-center gap-3 mb-6">
+        <span className="text-3xl">🌾</span>
+        <div>
+          <h1 className="text-2xl font-extrabold text-white">Farm Operations</h1>
+          <p className="text-xs text-slate-400">Fields · Planting · Inventory · Equipment · Tasks · Harvest</p>
+        </div>
+      </div>
+
+      {hbLoaded && <FarmAlert alerts={hbAlerts} />}
+
+      <div className="flex gap-1 flex-wrap mb-6">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${tab === t.id ? 'bg-violet-600 border-violet-500 text-white' : 'border-zinc-700 text-slate-400 hover:border-violet-600 hover:text-slate-200'}`}>
+            <span>{t.icon}</span>{t.label}
+          </button>
+        ))}
+      </div>
+
+      <div>
+        {tab === 'fields'    && <FarmOpsFields    fields={fields} setFields={setFields} />}
+        {tab === 'planting'  && <FarmOpsPlanting  fields={fields} />}
+        {tab === 'inventory' && <FarmOpsInventory />}
+        {tab === 'equipment' && <FarmOpsEquipment />}
+        {tab === 'tasks'     && <FarmOpsTasks     fields={fields} />}
+        {tab === 'harvest'   && <FarmOpsHarvest   fields={fields} />}
+      </div>
+    </div>
+  );
+}
+
 // ── FloraBot Chatbot ──────────────────────────────────────────
 function FloraBot() {
   const [open, setOpen] = useState(false);
@@ -2705,10 +3616,10 @@ function FloraBot() {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    if (open) {
-      setTimeout(() => msgsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
-      inputRef.current?.focus();
-    }
+    if (!open) return;
+    const t = setTimeout(() => msgsEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 80);
+    inputRef.current?.focus();
+    return () => clearTimeout(t);
   }, [open, msgs]);
 
   const SUGGESTIONS = ['Is this plant edible?', 'Survival tips?', 'Treat an insect sting?', 'Identify mushrooms safely?'];
@@ -2726,6 +3637,9 @@ function FloraBot() {
         credentials: 'include',
         body: JSON.stringify({ message: q }),
       });
+      if (!r.ok) throw new Error(`Server error ${r.status}`);
+      const ct = r.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) throw new Error('Unexpected response format');
       const d = await r.json();
       setMsgs(m => [...m, { role: 'bot', text: d.reply || d.message || d.response || "I couldn't process that. Try again!" }]);
     } catch {
@@ -2852,6 +3766,7 @@ export default function App() {
             {page === 'survival'  && <SurvivalPage onNav={onNav} />}
             {page === 'map'       && <MapPage />}
             {page === 'farming'   && <FarmingPage />}
+            {page === 'farm-ops'  && <FarmOpsPage />}
             {page === 'journal'   && <JournalPage />}
             {page === 'favorites' && <FavoritesPage />}
             {page === 'landscape' && <LandscapePage />}

@@ -597,6 +597,138 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_landscape_env    ON landscape_analyses(environment_type);
   `);
 
+  // ── Farm Operations ───────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS farm_fields (
+      id             SERIAL PRIMARY KEY,
+      user_id        INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      name           TEXT NOT NULL,
+      acreage        REAL,
+      soil_type      TEXT,
+      last_soil_test DATE,
+      notes          TEXT,
+      created_at     TIMESTAMPTZ DEFAULT NOW(),
+      updated_at     TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_farm_fields_user ON farm_fields(user_id);
+
+    CREATE TABLE IF NOT EXISTS farm_rotation (
+      id          SERIAL PRIMARY KEY,
+      field_id    INTEGER REFERENCES farm_fields(id) ON DELETE CASCADE,
+      season      TEXT NOT NULL,
+      crop_name   TEXT NOT NULL,
+      crop_family TEXT,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(field_id, season, crop_family)
+    );
+    CREATE INDEX IF NOT EXISTS idx_farm_rotation_field ON farm_rotation(field_id);
+
+    CREATE TABLE IF NOT EXISTS farm_plantings (
+      id              SERIAL PRIMARY KEY,
+      user_id         INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      field_id        INTEGER REFERENCES farm_fields(id) ON DELETE SET NULL,
+      season          TEXT,
+      crop_name       TEXT NOT NULL,
+      variety         TEXT,
+      seed_lot        TEXT,
+      planned_date    DATE,
+      actual_date     DATE,
+      seed_rate       REAL,
+      days_to_maturity INTEGER,
+      target_yield_kg REAL,
+      status          TEXT NOT NULL DEFAULT 'planned',
+      notes           TEXT,
+      created_at      TIMESTAMPTZ DEFAULT NOW(),
+      updated_at      TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_farm_plantings_user  ON farm_plantings(user_id);
+    CREATE INDEX IF NOT EXISTS idx_farm_plantings_field ON farm_plantings(field_id);
+
+    CREATE TABLE IF NOT EXISTS farm_inventory (
+      id                 SERIAL PRIMARY KEY,
+      user_id            INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      category           TEXT NOT NULL,
+      name               TEXT NOT NULL,
+      quantity           REAL NOT NULL DEFAULT 0,
+      unit               TEXT,
+      reorder_point      REAL NOT NULL DEFAULT 0,
+      daily_usage        REAL,
+      lead_time_days     INTEGER,
+      preferred_supplier TEXT,
+      last_price_usd     REAL,
+      expiry_date        DATE,
+      notes              TEXT,
+      created_at         TIMESTAMPTZ DEFAULT NOW(),
+      updated_at         TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_farm_inventory_user ON farm_inventory(user_id);
+
+    CREATE TABLE IF NOT EXISTS farm_equipment (
+      id                   SERIAL PRIMARY KEY,
+      user_id              INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      name                 TEXT NOT NULL,
+      make_model           TEXT,
+      hours_current        REAL DEFAULT 0,
+      service_interval_hrs REAL,
+      next_service_date    DATE,
+      insurance_renewal    DATE,
+      notes                TEXT,
+      created_at           TIMESTAMPTZ DEFAULT NOW(),
+      updated_at           TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_farm_equipment_user ON farm_equipment(user_id);
+
+    CREATE TABLE IF NOT EXISTS farm_equipment_log (
+      id               SERIAL PRIMARY KEY,
+      equipment_id     INTEGER REFERENCES farm_equipment(id) ON DELETE CASCADE,
+      user_id          INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      log_type         TEXT NOT NULL DEFAULT 'maintenance',
+      description      TEXT,
+      hours_at_service REAL,
+      parts_json       JSONB DEFAULT '[]',
+      cost_usd         REAL,
+      downtime_hrs     REAL,
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_farm_equip_log ON farm_equipment_log(equipment_id);
+
+    CREATE TABLE IF NOT EXISTS farm_tasks (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      field_id    INTEGER REFERENCES farm_fields(id) ON DELETE SET NULL,
+      title       TEXT NOT NULL,
+      description TEXT,
+      due_date    TIMESTAMPTZ,
+      assigned_to TEXT,
+      status      TEXT NOT NULL DEFAULT 'pending',
+      priority    TEXT NOT NULL DEFAULT 'medium',
+      est_hours   REAL,
+      created_at  TIMESTAMPTZ DEFAULT NOW(),
+      updated_at  TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_farm_tasks_user   ON farm_tasks(user_id);
+    CREATE INDEX IF NOT EXISTS idx_farm_tasks_status ON farm_tasks(status);
+
+    CREATE TABLE IF NOT EXISTS farm_harvests (
+      id               SERIAL PRIMARY KEY,
+      user_id          INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      field_id         INTEGER REFERENCES farm_fields(id) ON DELETE SET NULL,
+      planting_id      INTEGER REFERENCES farm_plantings(id) ON DELETE SET NULL,
+      crop_name        TEXT NOT NULL,
+      start_date       DATE,
+      end_date         DATE,
+      area_acres       REAL,
+      yield_kg         REAL,
+      moisture_pct     REAL,
+      grade            TEXT,
+      storage_location TEXT,
+      notes            TEXT,
+      created_at       TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_farm_harvests_user  ON farm_harvests(user_id);
+    CREATE INDEX IF NOT EXISTS idx_farm_harvests_field ON farm_harvests(field_id);
+  `);
+
   // ── Cooking guides cache ──────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS cooking_guides (

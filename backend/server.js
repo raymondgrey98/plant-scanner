@@ -29,6 +29,8 @@ const weatherRoutes      = require('./routes/weather');
 const survivalRoutes     = require('./routes/survival');
 const mapRoutes          = require('./routes/map');
 const farmingRoutes      = require('./routes/farming');
+const farmOpsRoutes      = require('./routes/farm-ops');
+const newsRoutes         = require('./routes/news');
 const landscapeRoutes    = require('./routes/landscape');
 const disastersRoutes    = require('./routes/disasters');
 
@@ -114,6 +116,8 @@ app.use('/api/weather',                  weatherRoutes);
 app.use('/api/survival',     scanLimit,  survivalRoutes);
 app.use('/api/map',                      mapRoutes);
 app.use('/api/farming',                  farmingRoutes);
+app.use('/api/farm-ops',                 farmOpsRoutes);
+app.use('/api/news',                     newsRoutes);
 app.use('/api/landscape',    scanLimit,  landscapeRoutes);
 app.use('/api/disasters',                disastersRoutes);
 

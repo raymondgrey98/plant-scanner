@@ -88,4 +88,37 @@ router.get('/reliefweb', async (_req, res) => {
   } catch (e) { res.json([]); }
 });
 
+// GET /api/disasters/fires — NASA FIRMS real-time active fire data (24h, global, no key needed via DEMO_KEY)
+router.get('/fires', async (_req, res) => {
+  try {
+    // NASA FIRMS VIIRS NOAA-20 active fires, last 24h, global bounding box
+    // DEMO_KEY is provided by NASA for testing (limited to 30 req/hour)
+    // Users should register at https://firms.modaps.eosdis.nasa.gov/api/map_key/ for their own key
+    const firmsKey = process.env.NASA_FIRMS_KEY || 'DEMO_KEY';
+    const url = `https://firms.modaps.eosdis.nasa.gov/api/area/json/${firmsKey}/VIIRS_SNPP_NRT/-180,-90,180,90/1`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'FloraIQ/2.0' } });
+    if (!r.ok) throw new Error(`FIRMS ${r.status}`);
+    const raw = await r.json();
+    // Each entry: { latitude, longitude, bright_ti4, scan, track, acq_date, acq_time, satellite, confidence, frp, daynight }
+    const fires = (Array.isArray(raw) ? raw : [])
+      .filter(f => f.latitude && f.longitude && f.confidence !== 'low')
+      .slice(0, 2000)
+      .map(f => ({
+        lat:        parseFloat(f.latitude),
+        lng:        parseFloat(f.longitude),
+        brightness: parseFloat(f.bright_ti4 || f.bright_t31 || 330),
+        frp:        parseFloat(f.frp || 0),
+        confidence: f.confidence,
+        date:       f.acq_date,
+        time:       f.acq_time,
+        satellite:  f.satellite,
+        daynight:   f.daynight,
+      }));
+    res.json(fires);
+  } catch (e) {
+    // If FIRMS is down or rate-limited, return empty gracefully
+    res.json([]);
+  }
+});
+
 module.exports = router;

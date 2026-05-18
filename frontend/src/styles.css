@@ -134,10 +134,10 @@ em.sci { font-style: italic; color: #94a3b8; font-size: 0.85rem; }
   border-radius: 50%;
   box-shadow: 0 0 10px currentColor;
 }
-.iso-particle:nth-child(1) { color: rgba(124,58,237,0.8);  background: rgba(124,58,237,0.8);  top: 12%;  left: 14%;  animation: p-orbit1 9s linear infinite; }
-.iso-particle:nth-child(2) { color: rgba(59,130,246,0.8);  background: rgba(59,130,246,0.8);  top: 16%;  right: 14%; animation: p-orbit2 11s linear infinite; }
-.iso-particle:nth-child(3) { color: rgba(20,184,166,0.8);  background: rgba(20,184,166,0.8);  bottom:16%;left: 18%;  animation: p-orbit1 13s linear infinite reverse; }
-.iso-particle:nth-child(4) { color: rgba(167,139,250,0.8); background: rgba(167,139,250,0.8); bottom:12%;right:18%;  animation: p-orbit2 10s linear infinite reverse; }
+.iso-particle:nth-child(5) { color: rgba(124,58,237,0.8);  background: rgba(124,58,237,0.8);  top: 12%;  left: 14%;  animation: p-orbit1 9s linear infinite; }
+.iso-particle:nth-child(6) { color: rgba(59,130,246,0.8);  background: rgba(59,130,246,0.8);  top: 16%;  right: 14%; animation: p-orbit2 11s linear infinite; }
+.iso-particle:nth-child(7) { color: rgba(20,184,166,0.8);  background: rgba(20,184,166,0.8);  bottom:16%;left: 18%;  animation: p-orbit1 13s linear infinite reverse; }
+.iso-particle:nth-child(8) { color: rgba(167,139,250,0.8); background: rgba(167,139,250,0.8); bottom:12%;right:18%;  animation: p-orbit2 10s linear infinite reverse; }
 
 @keyframes iso-float {
   0%, 100% { transform: rotate(45deg) translateY(0px); }
