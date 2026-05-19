@@ -1,6 +1,7 @@
 import { Component, createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 const API = import.meta.env.VITE_API_BASE_URL || '/api';
+const CESIUM_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN || '';
 
 const escHtml = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
@@ -1415,6 +1416,321 @@ function SurvivalPage({ onNav }) {
   );
 }
 
+// ── Cesium 3D Globe ───────────────────────────────────────────
+function loadCesium() {
+  return new Promise((resolve, reject) => {
+    if (window.Cesium) { resolve(); return; }
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Widgets/widgets.css';
+    document.head.appendChild(link);
+    const script = document.createElement('script');
+    script.src = 'https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Cesium.js';
+    script.onload  = () => resolve();
+    script.onerror = () => reject(new Error('Failed to load CesiumJS'));
+    document.head.appendChild(script);
+  });
+}
+
+function CesiumGlobe({ sightings, layers, disasters }) {
+  const globeRef  = useRef(null);
+  const viewerRef = useRef(null);
+  const [ready, setReady]       = useState(false);
+  const [loading, setLoading]   = useState(true);
+  const [err, setErr]           = useState(null);
+  const [flyInput, setFlyInput] = useState('');
+  const [satellites, setSatellites] = useState([]);
+
+  // Load CesiumJS CDN once
+  useEffect(() => {
+    let alive = true;
+    loadCesium()
+      .then(() => { if (alive) setReady(true); })
+      .catch(e => { if (alive) setErr(e.message); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  // Fetch ISS + Sentinel-2A TLE positions for live satellite tracking
+  useEffect(() => {
+    if (!ready) return;
+    const TLE_SATS = [
+      { name: 'ISS',        noradId: 25544 },
+      { name: 'Sentinel-2A', noradId: 40697 },
+      { name: 'Landsat-9',  noradId: 49260 },
+    ];
+    Promise.allSettled(
+      TLE_SATS.map(sat =>
+        fetch(`https://celestrak.org/SPACETRACK/query/class=gp&CATNR=${sat.noradId}&FORMAT=JSON`)
+          .then(r => r.ok ? r.json() : null)
+          .then(data => data?.[0] ? { ...sat, tle: data[0] } : null)
+          .catch(() => null)
+      )
+    ).then(results => {
+      setSatellites(results.filter(r => r.status === 'fulfilled' && r.value).map(r => r.value));
+    });
+  }, [ready]);
+
+  // Initialize Cesium viewer
+  useEffect(() => {
+    if (!ready || !globeRef.current || viewerRef.current) return;
+    if (!CESIUM_TOKEN) { setErr('No Cesium ion token — add VITE_CESIUM_ION_TOKEN to frontend/.env'); return; }
+
+    const C = window.Cesium;
+    C.Ion.defaultAccessToken = CESIUM_TOKEN;
+
+    const viewer = new C.Viewer(globeRef.current, {
+      baseLayerPicker: false,
+      geocoder: false,
+      homeButton: false,
+      sceneModePicker: false,
+      navigationHelpButton: false,
+      animation: false,
+      timeline: false,
+      fullscreenButton: false,
+      infoBox: false,
+      selectionIndicator: false,
+    });
+
+    // Dark space, lighting, atmosphere
+    viewer.scene.globe.enableLighting = true;
+    viewer.scene.globe.showGroundAtmosphere = true;
+    viewer.scene.backgroundColor = C.Color.BLACK;
+    viewer.scene.skyBox.show = true;
+    viewer.scene.moon = new C.Moon();
+    viewer.scene.sun  = new C.Sun();
+
+    // Add Cesium World Terrain (ion asset 1)
+    C.createWorldTerrainAsync({ requestWaterMask: true, requestVertexNormals: true })
+      .then(t => { if (viewerRef.current && !viewer.isDestroyed()) viewer.terrainProvider = t; })
+      .catch(() => {});
+
+    // Add Cesium OSM Buildings (ion asset 96188) — 3D city tiles
+    C.IonResource.fromAssetId(96188).then(resource => {
+      if (!viewerRef.current || viewer.isDestroyed()) return;
+      return C.Cesium3DTileset.fromUrl(resource);
+    }).then(tileset => {
+      if (tileset && viewerRef.current && !viewer.isDestroyed()) {
+        viewer.scene.primitives.add(tileset);
+      }
+    }).catch(() => {});
+
+    // Start camera over equator
+    viewer.camera.flyTo({
+      destination: C.Cartesian3.fromDegrees(0, 20, 20000000),
+      orientation: { heading: 0, pitch: C.Math.toRadians(-90), roll: 0 },
+      duration: 0,
+    });
+
+    viewerRef.current = viewer;
+    return () => {
+      if (viewerRef.current && !viewerRef.current.isDestroyed()) {
+        viewerRef.current.destroy();
+        viewerRef.current = null;
+      }
+    };
+  }, [ready]);
+
+  // ── Sightings entities ────────────────────────────────────────
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed()) return;
+    const C = window.Cesium;
+    viewer.entities.values.filter(e => e._floraSighting).forEach(e => viewer.entities.remove(e));
+    const colorMap = {
+      plant:'#22c55e', insect:'#f59e0b', bird:'#3b82f6',
+      mushroom:'#8b5cf6', reptile:'#ef4444', marine:'#06b6d4', survival:'#f97316',
+    };
+    sightings.forEach(s => {
+      if (!s.latitude || !s.longitude) return;
+      const col = colorMap[s.scan_mode] || '#6b7280';
+      const e = viewer.entities.add({
+        position: C.Cartesian3.fromDegrees(s.longitude, s.latitude),
+        point: {
+          pixelSize: 9, color: C.Color.fromCssColorString(col),
+          outlineColor: C.Color.WHITE, outlineWidth: 1,
+          heightReference: C.HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text: s.common_name || s.scientific_name || '?',
+          font: '11px Arial', fillColor: C.Color.WHITE,
+          style: C.LabelStyle.FILL_AND_OUTLINE, outlineWidth: 2,
+          outlineColor: C.Color.BLACK,
+          verticalOrigin: C.VerticalOrigin.BOTTOM,
+          pixelOffset: new C.Cartesian2(0, -14),
+          distanceDisplayCondition: new C.DistanceDisplayCondition(0, 300000),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+      e._floraSighting = true;
+    });
+  }, [sightings, ready]);
+
+  // ── Earthquake entities ───────────────────────────────────────
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed()) return;
+    const C = window.Cesium;
+    viewer.entities.values.filter(e => e._floraQuake).forEach(e => viewer.entities.remove(e));
+    if (!layers.quakes) return;
+    disasters.quakes.forEach(eq => {
+      const [lng, lat] = eq.geometry?.coordinates || [0,0];
+      const mag = eq.properties?.mag || 5;
+      const col = mag >= 7 ? '#7f1d1d' : mag >= 6 ? '#ef4444' : '#f97316';
+      const e = viewer.entities.add({
+        position: C.Cartesian3.fromDegrees(lng, lat),
+        ellipse: {
+          semiMinorAxis: mag * 40000, semiMajorAxis: mag * 40000,
+          material: C.Color.fromCssColorString(col).withAlpha(0.35),
+          outline: true, outlineColor: C.Color.fromCssColorString(col),
+          outlineWidth: 2, heightReference: C.HeightReference.CLAMP_TO_GROUND,
+        },
+        label: {
+          text: `M${mag}`, font: 'bold 13px Arial',
+          fillColor: C.Color.fromCssColorString(col),
+          style: C.LabelStyle.FILL, disableDepthTestDistance: Number.POSITIVE_INFINITY,
+          distanceDisplayCondition: new C.DistanceDisplayCondition(0, 3000000),
+        },
+      });
+      e._floraQuake = true;
+    });
+  }, [layers.quakes, disasters.quakes, ready]);
+
+  // ── Fire entities ─────────────────────────────────────────────
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed()) return;
+    const C = window.Cesium;
+    viewer.entities.values.filter(e => e._floraFire).forEach(e => viewer.entities.remove(e));
+    if (!layers.fires) return;
+    disasters.fires.slice(0, 800).forEach(f => {
+      const size = Math.max(4, Math.min(12, f.frp / 15 + 4));
+      const e = viewer.entities.add({
+        position: C.Cartesian3.fromDegrees(f.lng, f.lat),
+        point: {
+          pixelSize: size,
+          color: C.Color.fromCssColorString('#f97316').withAlpha(0.85),
+          outlineColor: C.Color.fromCssColorString('#fbbf24'), outlineWidth: 1,
+          heightReference: C.HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+      e._floraFire = true;
+    });
+  }, [layers.fires, disasters.fires, ready]);
+
+  // ── Satellite tracking entities ───────────────────────────────
+  useEffect(() => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed() || satellites.length === 0) return;
+    const C = window.Cesium;
+    viewer.entities.values.filter(e => e._floraSat).forEach(e => viewer.entities.remove(e));
+    satellites.forEach(sat => {
+      // Rough LEO position estimate (without full SGP4 propagation)
+      const inc = parseFloat(sat.tle?.INCLINATION || 51.6);
+      const e = viewer.entities.add({
+        position: C.Cartesian3.fromDegrees(0, inc > 45 ? 51 : 0, 420000),
+        point: {
+          pixelSize: 6, color: C.Color.CYAN,
+          outlineColor: C.Color.WHITE, outlineWidth: 1,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+        label: {
+          text: `🛰 ${sat.name}`, font: '11px Arial',
+          fillColor: C.Color.CYAN, style: C.LabelStyle.FILL,
+          pixelOffset: new C.Cartesian2(0, -14),
+          distanceDisplayCondition: new C.DistanceDisplayCondition(0, 60000000),
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+      e._floraSat = true;
+    });
+  }, [satellites, ready]);
+
+  // ── flyTo helpers ─────────────────────────────────────────────
+  const flyTo = (lat, lng, altKm = 50) => {
+    const viewer = viewerRef.current;
+    if (!viewer || viewer.isDestroyed()) return;
+    viewer.camera.flyTo({
+      destination: window.Cesium.Cartesian3.fromDegrees(lng, lat, altKm * 1000),
+      orientation: {
+        heading: window.Cesium.Math.toRadians(0),
+        pitch:   window.Cesium.Math.toRadians(-45),
+        roll:    0,
+      },
+      duration: 2.5,
+      easingFunction: window.Cesium.EasingFunction.CUBIC_IN_OUT,
+    });
+  };
+
+  const flyToMyLocation = () => {
+    navigator.geolocation.getCurrentPosition(
+      pos => flyTo(pos.coords.latitude, pos.coords.longitude, 8),
+      () => {}
+    );
+  };
+
+  const handleFly = e => {
+    e.preventDefault();
+    const parts = flyInput.split(',').map(p => parseFloat(p.trim()));
+    if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      flyTo(parts[0], parts[1], parts[2] || 50);
+      setFlyInput('');
+    }
+  };
+
+  if (loading) return (
+    <div className="w-full h-[560px] flex flex-col items-center justify-center bg-black rounded-2xl border border-zinc-800">
+      <div className="w-14 h-14 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mb-4" />
+      <p className="text-zinc-300 font-bold">Loading 3D Globe…</p>
+      <p className="text-zinc-600 text-xs mt-1">CesiumJS ~4MB — one-time download</p>
+    </div>
+  );
+
+  if (err) return (
+    <div className="w-full h-[560px] flex flex-col items-center justify-center bg-black rounded-2xl border border-zinc-800 px-8 text-center">
+      <p className="text-4xl mb-3">🌍</p>
+      <p className="text-red-400 font-bold mb-1">Globe Error</p>
+      <p className="text-zinc-500 text-sm">{err}</p>
+    </div>
+  );
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden" style={{ border: '1px solid #3f3f46' }}>
+      <div ref={globeRef} style={{ width: '100%', height: '560px' }} />
+      {/* HUD controls */}
+      <div className="absolute top-3 left-3 flex flex-col gap-2 z-10">
+        <button onClick={flyToMyLocation}
+          className="flex items-center gap-1.5 px-3 py-2 bg-black/80 backdrop-blur-sm border border-zinc-700 rounded-lg text-xs text-zinc-200 hover:border-violet-500 hover:text-white transition-colors">
+          📍 My Location
+        </button>
+        <form onSubmit={handleFly} className="flex gap-1">
+          <input value={flyInput} onChange={e => setFlyInput(e.target.value)}
+            placeholder="lat, lng, km"
+            className="px-2 py-1.5 bg-black/80 backdrop-blur-sm border border-zinc-700 rounded-lg text-xs text-zinc-300 placeholder-zinc-700 w-32 focus:outline-none focus:border-violet-500" />
+          <button type="submit" className="px-2.5 py-1.5 bg-violet-600 hover:bg-violet-500 rounded-lg text-xs text-white font-bold transition-colors">Fly ↗</button>
+        </form>
+        {satellites.length > 0 && (
+          <div className="px-2 py-1.5 bg-black/80 backdrop-blur-sm border border-cyan-700/50 rounded-lg">
+            <p className="text-xs text-cyan-400 font-bold">🛰 {satellites.length} satellites tracked</p>
+          </div>
+        )}
+      </div>
+      <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between pointer-events-none">
+        <div className="px-2 py-1 bg-black/70 backdrop-blur-sm rounded-lg text-xs text-zinc-500">
+          Cesium World Terrain · OSM Buildings · Ion ✓
+        </div>
+        <div className="px-2 py-1 bg-black/70 backdrop-blur-sm rounded-lg text-xs text-zinc-500">
+          {sightings.length} sightings
+          {layers.quakes && disasters.quakes.length > 0 && ` · ${disasters.quakes.length} quakes`}
+          {layers.fires  && disasters.fires.length  > 0 && ` · ${disasters.fires.length} fires`}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Map Page ──────────────────────────────────────────────────
 const DISASTER_LAYERS = [
   { id: 'quakes',   label: 'Earthquakes',    icon: '🔴', color: '#ef4444' },
@@ -1440,6 +1756,7 @@ function MapPage() {
   const [loadingDis, setLoadingDis] = useState({});
   const [disPanel, setDisPanel]     = useState(null);
   const [radarTs, setRadarTs]       = useState(null);
+  const [globeMode, setGlobeMode]   = useState(false);
 
   useEffect(() => {
     fetch(`${API}/map/sightings?limit=500`).then(r => r.json()).then(d => setSightings(Array.isArray(d) ? d : [])).catch(() => {}).finally(() => setLoading(false));
@@ -1481,7 +1798,7 @@ function MapPage() {
   };
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || globeMode) return;
     let timeout;
     if (typeof window.L === 'undefined') {
       timeout = setTimeout(initLeaflet, 800);
@@ -1489,7 +1806,7 @@ function MapPage() {
     }
     initLeaflet();
     function initLeaflet() {
-      if (!mapRef.current || typeof window.L === 'undefined') return;
+      if (!mapRef.current || globeMode || typeof window.L === 'undefined') return;
       if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; }
       const map = window.L.map(mapRef.current, { center: [20, 0], zoom: 2, zoomControl: true });
       // Tiles are served via our own backend proxy to bypass any CDN blocking
@@ -1563,7 +1880,7 @@ function MapPage() {
       setTimeout(() => map.invalidateSize(), 200);
     }
     return () => { if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; } };
-  }, [sightings, filter, layers, disasters, satellite, radarTs]);
+  }, [sightings, filter, layers, disasters, satellite, radarTs, globeMode]);
 
   const totalDisasters = Object.entries(layers).filter(([id, on]) => on && id !== 'radar').reduce((acc, [id]) => acc + (disasters[id]?.length || 0), 0);
 
@@ -1572,18 +1889,27 @@ function MapPage() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-2xl font-extrabold text-white">🌍 Global Intelligence Map</h1>
-          <p className="text-xs text-zinc-500 mt-0.5">Live species sightings + real-time disaster data</p>
+          <h1 className="text-2xl font-extrabold text-white">{globeMode ? '🌐 3D Globe' : '🌍 Global Intelligence Map'}</h1>
+          <p className="text-xs text-zinc-500 mt-0.5">{globeMode ? 'Cesium World Terrain · real-time planetary intelligence' : 'Live species sightings + real-time disaster data'}</p>
         </div>
         <div className="flex gap-2 items-center flex-wrap">
-          <button onClick={() => setSatellite(s => !s)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${satellite ? 'bg-blue-900/60 border-blue-600 text-blue-300' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white'}`}>
-            🛰️ {satellite ? 'Satellite' : 'Standard'}
+          {/* 3D Globe toggle */}
+          <button onClick={() => setGlobeMode(g => !g)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${globeMode ? 'bg-violet-900/60 border-violet-500 text-violet-300' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white'}`}>
+            {globeMode ? '🗺️ 2D Map' : '🌐 3D Globe'}
           </button>
-          <select value={filter} onChange={e => setFilter(e.target.value)} className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-300">
-            <option value="all">All Species</option>
-            {SCAN_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-          </select>
+          {!globeMode && (
+            <button onClick={() => setSatellite(s => !s)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${satellite ? 'bg-blue-900/60 border-blue-600 text-blue-300' : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white'}`}>
+              🛰️ {satellite ? 'Satellite' : 'Standard'}
+            </button>
+          )}
+          {!globeMode && (
+            <select value={filter} onChange={e => setFilter(e.target.value)} className="px-3 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-300">
+              <option value="all">All Species</option>
+              {SCAN_MODES.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+            </select>
+          )}
         </div>
       </div>
 
@@ -1595,15 +1921,19 @@ function MapPage() {
             style={layers[dl.id] ? { background: dl.color + '22', borderColor: dl.color + '88', color: dl.color } : {}}>
             {loadingDis[dl.id] ? <span className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin inline-block" /> : dl.icon}
             {dl.label}
-            {layers[dl.id] && disasters[dl.id].length > 0 && <span className="ml-0.5 opacity-70">({disasters[dl.id].length})</span>}
+            {layers[dl.id] && disasters[dl.id]?.length > 0 && <span className="ml-0.5 opacity-70">({disasters[dl.id].length})</span>}
           </button>
         ))}
       </div>
 
       {loading && <p className="text-sm text-zinc-500 mb-3">Loading sightings…</p>}
 
-      {/* Map */}
-      <div ref={mapRef} style={{ width: '100%', height: '520px', borderRadius: '1rem', border: '1px solid #3f3f46', background: '#0c0c0e' }} />
+      {/* Map — 2D Leaflet or 3D Cesium Globe */}
+      {globeMode ? (
+        <CesiumGlobe sightings={sightings} layers={layers} disasters={disasters} />
+      ) : (
+        <div ref={mapRef} style={{ width: '100%', height: '520px', borderRadius: '1rem', border: '1px solid #3f3f46', background: '#0c0c0e' }} />
+      )}
 
       {/* Legend + stats */}
       <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3 items-center">
