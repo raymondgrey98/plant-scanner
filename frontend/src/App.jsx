@@ -805,6 +805,7 @@ function ScanPage({ onNav }) {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [stream, setStream] = useState(null);
   const [aiModel, setAiModel] = useState('');
+  const [celebrate, setCelebrate] = useState(false);
 
   const pickFile = e => {
     const f = e.target.files[0];
@@ -852,6 +853,8 @@ function ScanPage({ onNav }) {
       if (!r.ok) throw new Error(d.error || 'Analysis failed');
       setResult(d);
       setAiModel(d.ai_model || d.model || '');
+      setCelebrate(true);
+      setTimeout(() => setCelebrate(false), 2000);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
@@ -915,11 +918,16 @@ function ScanPage({ onNav }) {
 
       {loading && (
         <Card className="p-8 text-center">
-          <div className="w-10 h-10 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="text-5xl mb-3 animate-bounce">
+            {SCAN_MODES.find(m => m.id === mode)?.icon || '🔍'}
+          </div>
+          <div className="w-8 h-8 border-2 border-green-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-sm text-zinc-400">Running multi-model AI analysis…</p>
           <p className="text-xs text-zinc-600 mt-1">Gemini → GPT-4o → Claude chain</p>
         </Card>
       )}
+
+      {celebrate && <ResultCelebration mode={mode} />}
 
       {result && (
         <div className="space-y-4">
@@ -4385,30 +4393,115 @@ function SplashScreen({ onDone }) {
 }
 
 // ── Animated background particles ─────────────────────────────
-const PARTICLES = Array.from({ length: 20 }, (_, i) => ({
-  id: i,
-  left: `${Math.random() * 100}%`,
-  size: Math.random() * 4 + 2,
-  duration: Math.random() * 20 + 15,
-  delay: Math.random() * 15,
-  emoji: ['🌿','🍃','🌱','🌾','✦','·'][Math.floor(Math.random() * 6)],
-  opacity: Math.random() * 0.15 + 0.05,
-}));
+const PARTICLES = [
+  // Floating upward — plants & nature
+  ...['🌿','🍃','🌱','🌾','🌺','🌸','🍀','🌻','✦','·','🌟','💫'].map((emoji, i) => ({
+    id: i, type: 'float', emoji,
+    left: `${(i * 8.33 + 3) % 100}%`,
+    size: 2 + (i % 4),
+    duration: 15 + (i % 10) + 5,
+    delay: (i * 3.7) % 18,
+    opacity: 0.06 + (i % 5) * 0.025,
+  })),
+  // Flying horizontally — birds
+  ...['🐦','🦅','🦜','🕊️','🦢'].map((emoji, i) => ({
+    id: 100 + i, type: 'fly', emoji,
+    top: `${8 + (i * 13) % 55}%`,
+    size: 3 + (i % 3),
+    duration: 28 + (i * 6) % 18,
+    delay: (i * 9.3) % 35,
+    opacity: 0.13 + (i % 3) * 0.05,
+    drift: `${(i % 3 - 1) * 35}px`,
+  })),
+  // Zigzag across — butterflies & bees
+  ...['🦋','🐝','🦋'].map((emoji, i) => ({
+    id: 200 + i, type: 'zig', emoji,
+    top: `${20 + (i * 22) % 50}%`,
+    size: 2.5 + (i % 2),
+    duration: 32 + (i * 5) % 14,
+    delay: (i * 12.1) % 28,
+    opacity: 0.10 + (i % 3) * 0.04,
+  })),
+];
 
 function AnimatedBg() {
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden>
-      {PARTICLES.map(p => (
-        <div key={p.id} className="absolute bottom-0 select-none"
-          style={{
-            left: p.left,
+      {PARTICLES.map(p => {
+        let style;
+        if (p.type === 'fly') {
+          style = {
+            top: p.top, left: 0,
             fontSize: p.size * 4,
             opacity: p.opacity,
+            '--drift': p.drift || '0px',
+            willChange: 'transform, opacity',
+            animation: `birdFly ${p.duration}s linear ${p.delay}s infinite`,
+          };
+        } else if (p.type === 'zig') {
+          style = {
+            top: p.top, left: 0,
+            fontSize: p.size * 4,
+            opacity: p.opacity,
+            willChange: 'transform, opacity',
+            animation: `butterflyZig ${p.duration}s ease-in-out ${p.delay}s infinite`,
+          };
+        } else {
+          style = {
+            bottom: 0, left: p.left,
+            fontSize: p.size * 4,
+            opacity: p.opacity,
+            willChange: 'transform, opacity',
             animation: `floraFloat ${p.duration}s linear ${p.delay}s infinite`,
-          }}>
-          {p.emoji}
-        </div>
-      ))}
+          };
+        }
+        return <div key={p.id} className="absolute select-none" style={style}>{p.emoji}</div>;
+      })}
+    </div>
+  );
+}
+
+// ── Scan result celebration burst ─────────────────────────────
+const MODE_EMOJIS = {
+  plant:    ['🌿','🍃','🌸','🌺','🌱','🌻'],
+  insect:   ['🐛','🦋','🐝','🐞','🦗','🦟'],
+  bird:     ['🐦','🦅','🦜','🦢','🕊️','🦆'],
+  mushroom: ['🍄','🌰','🍂','🌿'],
+  reptile:  ['🦎','🐍','🐢','🐊'],
+  marine:   ['🐠','🐟','🐬','🦈','🌊','🐙'],
+  survival: ['⚠️','🔥','💧','🏕️','🌲','🪨'],
+};
+
+const BURST_COUNT = 10;
+const BURST_ANGLES = Array.from({ length: BURST_COUNT }, (_, i) => (i * 360) / BURST_COUNT);
+
+function ResultCelebration({ mode }) {
+  const [alive, setAlive] = useState(true);
+  const emojis = MODE_EMOJIS[mode] || MODE_EMOJIS.plant;
+  useEffect(() => {
+    const t = setTimeout(() => setAlive(false), 1800);
+    return () => clearTimeout(t);
+  }, []);
+  if (!alive) return null;
+  return (
+    <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
+      <div className="relative">
+        {BURST_ANGLES.map((angle, i) => {
+          const rad = (angle * Math.PI) / 180;
+          const dist = 70 + (i % 3) * 45;
+          return (
+            <div key={i} className="absolute text-2xl" style={{
+              top: 0, left: 0,
+              '--tx': `${Math.cos(rad) * dist}px`,
+              '--ty': `${Math.sin(rad) * dist}px`,
+              '--rot': `${(i % 3 - 1) * 120}deg`,
+              animation: `resultBurst 1.4s ease-out ${i * 0.06}s forwards`,
+            }}>
+              {emojis[i % emojis.length]}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
