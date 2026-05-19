@@ -1,4 +1,6 @@
 import { Component, createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const API = import.meta.env.VITE_API_BASE_URL || '/api';
 const CESIUM_TOKEN = import.meta.env.VITE_CESIUM_ION_TOKEN || '';
@@ -1111,6 +1113,24 @@ function SpeciesModal({ sp, onClose }) {
             <a href={`https://www.youtube.com/results?search_query=${encodeURIComponent(name + ' documentary nature')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2.5 bg-red-900 hover:bg-red-800 text-white text-sm font-semibold rounded-xl transition">🎬 YouTube — Nature Documentaries</a>
           </div>
 
+          {/* Search Engines */}
+          <div className="flex flex-col gap-2">
+            <p className="text-xs font-bold text-zinc-500 uppercase tracking-widest">Search Online</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { icon: '🔍', label: 'Google', href: `https://www.google.com/search?q=${encodeURIComponent(name + ' ' + sciName)}`, cls: 'bg-blue-950/40 border-blue-700/40 text-blue-300 hover:bg-blue-950/70' },
+                { icon: '🦆', label: 'DuckDuckGo', href: `https://duckduckgo.com/?q=${encodeURIComponent(name + ' species')}`, cls: 'bg-orange-950/40 border-orange-700/40 text-orange-300 hover:bg-orange-950/70' },
+                { icon: '🔎', label: 'Bing', href: `https://www.bing.com/search?q=${encodeURIComponent(sciName + ' species')}`, cls: 'bg-cyan-950/40 border-cyan-700/40 text-cyan-300 hover:bg-cyan-950/70' },
+                { icon: '🖼️', label: 'Google Images', href: `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(name + ' ' + sciName)}`, cls: 'bg-green-950/40 border-green-700/40 text-green-300 hover:bg-green-950/70' },
+              ].map(s => (
+                <a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
+                  className={`flex items-center gap-2 px-3 py-2.5 border rounded-xl text-sm font-semibold transition ${s.cls}`}>
+                  {s.icon} {s.label}
+                </a>
+              ))}
+            </div>
+          </div>
+
           <button onClick={onClose} className="w-full mt-2 py-2 text-sm text-zinc-500 hover:text-zinc-300 transition">Close</button>
         </div>
       </div>
@@ -1218,7 +1238,7 @@ function LibraryPage() {
       </div>
 
       {/* Instant search — stays within active category */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-3">
         <div className="relative flex-1">
           <input
             value={query}
@@ -1231,6 +1251,24 @@ function LibraryPage() {
         {(isSearchMode || query) && (
           <button onClick={() => { setQuery(''); loadCategory(category); }} className="px-3 py-2.5 bg-zinc-800 text-zinc-400 text-sm rounded-xl hover:text-white">✕</button>
         )}
+      </div>
+      {/* Web search engines */}
+      <div className="flex gap-2 flex-wrap mb-5">
+        <span className="text-xs text-zinc-600 self-center">Search web:</span>
+        {[
+          { label: '🔍 Google', base: 'https://www.google.com/search?q=', color: 'border-blue-700/40 text-blue-400 hover:bg-blue-950/30' },
+          { label: '🦆 DuckDuckGo', base: 'https://duckduckgo.com/?q=', color: 'border-orange-700/40 text-orange-400 hover:bg-orange-950/30' },
+          { label: '🔎 Bing', base: 'https://www.bing.com/search?q=', color: 'border-cyan-700/40 text-cyan-400 hover:bg-cyan-950/30' },
+          { label: '📖 Wikipedia', base: 'https://en.wikipedia.org/wiki/Special:Search?search=', color: 'border-zinc-600 text-zinc-400 hover:bg-zinc-800' },
+        ].map(s => {
+          const searchTerm = query.trim() ? `${query} ${catInfo.label}` : `${catInfo.label} species`;
+          return (
+            <a key={s.label} href={`${s.base}${encodeURIComponent(searchTerm)}`} target="_blank" rel="noreferrer"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${s.color}`}>
+              {s.label}
+            </a>
+          );
+        })}
       </div>
 
       {/* Grid */}
@@ -1799,27 +1837,23 @@ function MapPage() {
 
   useEffect(() => {
     if (!mapRef.current || globeMode) return;
-    let timeout;
-    if (typeof window.L === 'undefined') {
-      timeout = setTimeout(initLeaflet, 800);
-      return () => clearTimeout(timeout);
-    }
     initLeaflet();
     function initLeaflet() {
-      if (!mapRef.current || globeMode || typeof window.L === 'undefined') return;
+      if (!mapRef.current || globeMode) return;
       if (leafletMap.current) { leafletMap.current.remove(); leafletMap.current = null; }
-      const map = window.L.map(mapRef.current, { center: [20, 0], zoom: 2, zoomControl: true });
-      // Tiles are served via our own backend proxy to bypass any CDN blocking
-      const style   = satellite ? 'satellite' : 'dark';
-      const tileUrl = `${API}/map/tiles/${style}/{z}/{x}/{y}`;
-      const tileAttr = satellite ? 'Tiles © Esri / USGS / NOAA' : '© CartoDB / OpenStreetMap contributors';
-      tileLayerRef.current = window.L.tileLayer(tileUrl, { attribution: tileAttr, maxZoom: 19, errorTileUrl: '' }).addTo(map);
+      const map = L.map(mapRef.current, { center: [20, 0], zoom: 2, zoomControl: true });
+      // Esri public tiles — no API key, no CDN blocking, proper CORS
+      const tileUrl = satellite
+        ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+        : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}';
+      const tileAttr = satellite ? 'Tiles © Esri | Airbus | USGS' : 'Tiles © Esri | DeLorme | HERE';
+      tileLayerRef.current = L.tileLayer(tileUrl, { attribution: tileAttr, maxZoom: 19 }).addTo(map);
       const colorMap = { plant: '#22c55e', insect: '#f59e0b', bird: '#3b82f6', mushroom: '#8b5cf6', reptile: '#ef4444', marine: '#06b6d4', survival: '#f97316' };
       const filtered = filter === 'all' ? sightings : sightings.filter(s => s.scan_mode === filter);
       filtered.forEach(s => {
         if (!s.latitude || !s.longitude) return;
         const color = colorMap[s.scan_mode] || '#6b7280';
-        window.L.circleMarker([s.latitude, s.longitude], { radius: 6, fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.85 })
+        L.circleMarker([s.latitude, s.longitude], { radius: 6, fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.85 })
           .addTo(map)
           .bindPopup(`<b>${escHtml(s.common_name || 'Unknown')}</b><br><i>${escHtml(s.scientific_name || '')}</i><br><small>${escHtml(s.country || '')}</small>`);
       });
@@ -1830,7 +1864,7 @@ function MapPage() {
           const [lng, lat] = eq.geometry.coordinates;
           const mag = eq.properties.mag || 5;
           const color = mag >= 7 ? '#7f1d1d' : mag >= 6 ? '#ef4444' : '#f87171';
-          window.L.circleMarker([lat, lng], { radius: Math.max(5, mag * 3), fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.8 })
+          L.circleMarker([lat, lng], { radius: Math.max(5, mag * 3), fillColor: color, color: '#fff', weight: 1, fillOpacity: 0.8 })
             .addTo(map)
             .bindPopup(`<b>🔴 M${escHtml(String(mag))} Earthquake</b><br>${escHtml(eq.properties.place)}<br><small>${escHtml(new Date(eq.properties.time).toLocaleString())}</small>`);
         });
@@ -1841,7 +1875,7 @@ function MapPage() {
         disasters.fires.forEach(f => {
           const intensity = Math.min(Math.max(f.frp / 100, 0.4), 1);
           const radius = Math.max(3, Math.min(8, f.frp / 30 + 3));
-          window.L.circleMarker([f.lat, f.lng], {
+          L.circleMarker([f.lat, f.lng], {
             radius, fillColor: '#f97316', color: '#fbbf24', weight: 1, fillOpacity: intensity,
           }).addTo(map)
             .bindPopup(`<b>🔥 Active Fire</b><br>${escHtml(f.date || '')} ${escHtml(f.time || '')}<br><small>FRP: ${f.frp} MW · ${escHtml(f.confidence || '')} confidence · ${escHtml(f.satellite || '')}</small>`);
@@ -1854,7 +1888,7 @@ function MapPage() {
           if (!ev.lat || !ev.lng) return;
           const color = GDACS_COLORS[ev.type] || '#6b7280';
           const icon = ev.type === 'tc' ? '🌀' : ev.type === 'fl' ? '🌊' : ev.type === 'vo' ? '🌋' : ev.type === 'wf' ? '🔥' : ev.type === 'dr' ? '🏜️' : '⚠️';
-          window.L.circleMarker([ev.lat, ev.lng], { radius: 10, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.85 })
+          L.circleMarker([ev.lat, ev.lng], { radius: 10, fillColor: color, color: '#fff', weight: 1.5, fillOpacity: 0.85 })
             .addTo(map)
             .bindPopup(`<b>${icon} ${escHtml(ev.name || ev.type?.toUpperCase() || '')}</b><br>${escHtml(ev.country || '')}<br><span style="color:${ev.alert==='red'?'#ef4444':ev.alert==='orange'?'#f97316':'#22c55e'}">${escHtml((ev.alert||'').toUpperCase())} ALERT</span><br><small>${escHtml(ev.description || '')}</small>`);
         });
@@ -1862,7 +1896,7 @@ function MapPage() {
 
       // NOAA weather alerts (US bounding boxes — show as list, not map pins)
       if (layers.weather && disasters.weather.length > 0) {
-        window.L.popup({ maxWidth: 320 })
+        L.popup({ maxWidth: 320 })
           .setLatLng([38, -96])
           .setContent(`<b>⛈️ ${disasters.weather.length} Active US Weather Alerts</b><br>Click "Weather Alerts" panel below for details.`)
           .addTo(map);
@@ -1870,7 +1904,7 @@ function MapPage() {
 
       // RainViewer live precipitation radar overlay
       if (layers.radar && radarTs) {
-        window.L.tileLayer(
+        L.tileLayer(
           `https://tilecache.rainviewer.com/v2/radar/${radarTs}/512/{z}/{x}/{y}/4/1_1.png`,
           { opacity: 0.55, attribution: '© RainViewer', errorTileUrl: '', maxZoom: 12 }
         ).addTo(map);
@@ -4317,12 +4351,75 @@ function SOSPage() {
   );
 }
 
+// ── Splash Screen ─────────────────────────────────────────────
+function SplashScreen({ onDone }) {
+  const [fading, setFading] = useState(false);
+  useEffect(() => {
+    const t1 = setTimeout(() => setFading(true), 2000);
+    const t2 = setTimeout(onDone, 2600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [onDone]);
+  return (
+    <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-500 ${fading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      style={{ background: 'linear-gradient(135deg, #020810 0%, #0a1f0a 50%, #020810 100%)' }}>
+      {/* Animated rings */}
+      <div className="relative flex items-center justify-center mb-8">
+        {[1,2,3].map(i => (
+          <div key={i} className="absolute rounded-full border border-green-500/20 animate-ping"
+            style={{ width: i*80, height: i*80, animationDuration: `${i*0.8+0.6}s`, animationDelay: `${i*0.2}s` }} />
+        ))}
+        <div className="relative z-10 text-6xl">🌿</div>
+      </div>
+      <h1 className="text-5xl font-black tracking-widest text-white mb-2">
+        Flora<span style={{ color: '#22c55e' }}>IQ</span>
+      </h1>
+      <p className="text-zinc-500 text-sm tracking-widest uppercase mb-10">Global Biological Intelligence</p>
+      <div className="flex gap-2">
+        {[0,1,2,3,4].map(i => (
+          <div key={i} className="w-2 h-2 bg-green-400 rounded-full animate-bounce"
+            style={{ animationDelay: `${i * 0.15}s` }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Animated background particles ─────────────────────────────
+const PARTICLES = Array.from({ length: 20 }, (_, i) => ({
+  id: i,
+  left: `${Math.random() * 100}%`,
+  size: Math.random() * 4 + 2,
+  duration: Math.random() * 20 + 15,
+  delay: Math.random() * 15,
+  emoji: ['🌿','🍃','🌱','🌾','✦','·'][Math.floor(Math.random() * 6)],
+  opacity: Math.random() * 0.15 + 0.05,
+}));
+
+function AnimatedBg() {
+  return (
+    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden>
+      {PARTICLES.map(p => (
+        <div key={p.id} className="absolute bottom-0 select-none"
+          style={{
+            left: p.left,
+            fontSize: p.size * 4,
+            opacity: p.opacity,
+            animation: `floraFloat ${p.duration}s linear ${p.delay}s infinite`,
+          }}>
+          {p.emoji}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main App ──────────────────────────────────────────────────────────────────────────────────────────────
 export default function App() {
   const [page, setPage] = useState('home');
   const [notifCount, setNotifCount] = useState(0);
   const [showNotifs, setShowNotifs] = useState(false);
   const [installPrompt, setInstallPrompt] = useState(null);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
     const handler = e => { e.preventDefault(); setInstallPrompt(e); };
@@ -4361,7 +4458,9 @@ export default function App() {
   return (
     <AuthProvider>
       <ErrorBoundary>
+        {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
         <div className="min-h-screen text-slate-100">
+          <AnimatedBg />
           <Navbar
             active={page}
             onNav={onNav}
