@@ -741,6 +741,22 @@ async function initDb() {
     CREATE INDEX IF NOT EXISTS idx_cooking_plant ON cooking_guides(plant_name);
   `);
 
+  // ── ARGUS intel feed ──────────────────────────────────────────
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS argus_intel (
+      id         SERIAL PRIMARY KEY,
+      category   TEXT NOT NULL,
+      title      TEXT NOT NULL,
+      summary    TEXT NOT NULL,
+      source     TEXT NOT NULL DEFAULT 'argus',
+      url        TEXT DEFAULT '',
+      ts         TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_argus_category ON argus_intel(category);
+    CREATE INDEX IF NOT EXISTS idx_argus_created  ON argus_intel(created_at DESC);
+  `);
+
   console.log('[db] Database initialized successfully');
 }
 

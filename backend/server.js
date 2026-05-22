@@ -34,6 +34,7 @@ const newsRoutes         = require('./routes/news');
 const landscapeRoutes    = require('./routes/landscape');
 const disastersRoutes    = require('./routes/disasters');
 const sosRoutes          = require('./routes/sos');
+const argusRoutes        = require('./routes/argus');
 
 const PORT = process.env.PORT || 3001;
 const app  = express();
@@ -122,6 +123,7 @@ app.use('/api/news',                     newsRoutes);
 app.use('/api/landscape',    scanLimit,  landscapeRoutes);
 app.use('/api/disasters',                disastersRoutes);
 app.use('/api/sos',                      sosRoutes);
+app.use('/api/argus',                    argusRoutes);
 
 // ── Health + status ───────────────────────────────────────────
 app.get('/api/status', (_req, res) => {
