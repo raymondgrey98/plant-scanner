@@ -4377,139 +4377,16 @@ function SplashScreen({ onDone }) {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [onDone]);
   return (
-    <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-500 ${fading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-      style={{ background: 'linear-gradient(135deg, #020810 0%, #0a1f0a 50%, #020810 100%)' }}>
-      {/* Animated rings */}
-      <div className="relative flex items-center justify-center mb-8">
-        {[1,2,3].map(i => (
-          <div key={i} className="absolute rounded-full border border-green-500/20 animate-ping"
-            style={{ width: i*80, height: i*80, animationDuration: `${i*0.8+0.6}s`, animationDelay: `${i*0.2}s` }} />
-        ))}
-        <div className="relative z-10 text-6xl">🌿</div>
+    <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-700 ${fading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      style={{ background: '#080808' }}>
+      <div className="flex flex-col items-center gap-6">
+        <div className="w-px h-16 bg-gradient-to-b from-transparent to-[#c9a96e] opacity-60" />
+        <h1 className="font-display text-6xl font-light tracking-[0.15em] text-white" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
+          Flora<span style={{ color: '#c9a96e' }}>IQ</span>
+        </h1>
+        <p className="text-xs tracking-[0.35em] uppercase text-zinc-600">Biological Intelligence</p>
+        <div className="w-px h-16 bg-gradient-to-t from-transparent to-[#c9a96e] opacity-60" />
       </div>
-      <h1 className="text-5xl font-black tracking-widest text-white mb-2">
-        Flora<span style={{ color: '#22c55e' }}>IQ</span>
-      </h1>
-      <p className="text-zinc-500 text-sm tracking-widest uppercase mb-10">Global Biological Intelligence</p>
-      <div className="flex gap-2">
-        {[0,1,2,3,4].map(i => (
-          <div key={i} className="w-2 h-2 bg-green-400 rounded-full animate-bounce"
-            style={{ animationDelay: `${i * 0.15}s` }} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Subtle animated background ────────────────────────────────
-
-function SvgButterfly({ top, duration, delay, scale = 1 }) {
-  const flapSpeed = `${0.35 + Math.random() * 0.2}s`;
-  const hue = [270, 310, 200, 160][Math.floor(Math.random() * 4)];
-  const c1 = `hsla(${hue},80%,65%,0.5)`;
-  const c2 = `hsla(${hue},70%,55%,0.35)`;
-  return (
-    <div style={{
-      position: 'absolute', top, left: 0, willChange: 'transform',
-      animation: `butterflyZig ${duration}s ease-in-out ${delay}s infinite`,
-    }}>
-      <svg viewBox="0 0 90 70" width={90 * scale} height={70 * scale} style={{ overflow: 'visible' }}>
-        <g transform="translate(45,35)">
-          {/* Left upper wing */}
-          <path d="M0,0 Q-22,-28 -38,-12 Q-22,-2 0,0" fill={c1}
-            style={{ transformOrigin:'0 0', animation:`wingFold ${flapSpeed} ease-in-out infinite alternate` }} />
-          {/* Left lower wing */}
-          <path d="M0,0 Q-28,8 -32,24 Q-16,20 0,0" fill={c2}
-            style={{ transformOrigin:'0 0', animation:`wingFold ${flapSpeed} ease-in-out infinite alternate` }} />
-          {/* Right upper wing */}
-          <path d="M0,0 Q22,-28 38,-12 Q22,-2 0,0" fill={c1}
-            style={{ transformOrigin:'0 0', animation:`wingFold ${flapSpeed} ease-in-out infinite alternate-reverse` }} />
-          {/* Right lower wing */}
-          <path d="M0,0 Q28,8 32,24 Q16,20 0,0" fill={c2}
-            style={{ transformOrigin:'0 0', animation:`wingFold ${flapSpeed} ease-in-out infinite alternate-reverse` }} />
-          {/* Body */}
-          <ellipse cx="0" cy="4" rx="2.5" ry="11" fill={`hsla(${hue},60%,30%,0.6)`} />
-          {/* Antennae */}
-          <path d="M-1.5,-7 Q-6,-19 -5,-23" fill="none" stroke={`hsla(${hue},70%,70%,0.5)`} strokeWidth="1.2"/>
-          <path d="M1.5,-7 Q6,-19 5,-23" fill="none" stroke={`hsla(${hue},70%,70%,0.5)`} strokeWidth="1.2"/>
-          <circle cx="-5" cy="-23" r="2" fill={`hsla(${hue},70%,70%,0.5)`}/>
-          <circle cx="5" cy="-23" r="2" fill={`hsla(${hue},70%,70%,0.5)`}/>
-        </g>
-      </svg>
-    </div>
-  );
-}
-
-function SvgLeaf({ left, duration, delay, scale = 1 }) {
-  const green = `rgba(${34 + (delay|0)%40},${160 + (delay|0)%37},${94 + (delay|0)%30},0.38)`;
-  return (
-    <div style={{
-      position: 'absolute', bottom: 0, left, willChange: 'transform',
-      animation: `leafFloat ${duration}s ease-in-out ${delay}s infinite`,
-    }}>
-      <svg viewBox="0 0 38 56" width={38 * scale} height={56 * scale}>
-        <path d="M19,52 C7,40 4,26 11,14 C15,6 23,4 27,11 C34,21 32,40 19,52Z" fill={green} />
-        <path d="M19,52 Q21,33 19,14" fill="none" stroke={green} strokeWidth="1.5" opacity="0.6"/>
-        {/* Side veins */}
-        <path d="M19,38 Q25,30 27,26" fill="none" stroke={green} strokeWidth="0.8" opacity="0.5"/>
-        <path d="M19,28 Q25,20 26,16" fill="none" stroke={green} strokeWidth="0.8" opacity="0.5"/>
-        <path d="M19,38 Q13,30 11,26" fill="none" stroke={green} strokeWidth="0.8" opacity="0.5"/>
-      </svg>
-    </div>
-  );
-}
-
-function SvgFirefly({ style }) {
-  return (
-    <div style={{ position: 'absolute', willChange: 'transform', ...style }}>
-      <svg viewBox="0 0 12 12" width="12" height="12">
-        <circle cx="6" cy="6" r="3" fill="rgba(255,255,150,0.9)">
-          <animate attributeName="r" values="2;4;2" dur="1.8s" repeatCount="indefinite"/>
-          <animate attributeName="opacity" values="0.4;1;0.4" dur="1.8s" repeatCount="indefinite"/>
-        </circle>
-        <circle cx="6" cy="6" r="6" fill="rgba(255,255,100,0.15)">
-          <animate attributeName="r" values="4;8;4" dur="1.8s" repeatCount="indefinite"/>
-        </circle>
-      </svg>
-    </div>
-  );
-}
-
-const BG_BUTTERFLIES = [
-  { top:'18%', duration:44, delay:2,  scale:0.9 },
-  { top:'42%', duration:52, delay:14, scale:1.1 },
-  { top:'30%', duration:48, delay:28, scale:0.85 },
-];
-const BG_LEAVES = [
-  { left:'5%',  duration:18, delay:0,  scale:1.0 },
-  { left:'18%', duration:22, delay:4,  scale:0.85 },
-  { left:'32%', duration:16, delay:9,  scale:1.2 },
-  { left:'48%', duration:24, delay:2,  scale:0.9 },
-  { left:'63%', duration:19, delay:13, scale:1.0 },
-  { left:'75%', duration:21, delay:7,  scale:0.8 },
-  { left:'88%', duration:17, delay:17, scale:1.1 },
-  { left:'94%', duration:23, delay:5,  scale:0.95 },
-];
-const BG_FIREFLIES = [
-  { left:'12%', top:'65%', animDur:'6s',  animDelay:'0s'  },
-  { left:'28%', top:'55%', animDur:'8s',  animDelay:'2s'  },
-  { left:'55%', top:'70%', animDur:'7s',  animDelay:'4s'  },
-  { left:'72%', top:'60%', animDur:'9s',  animDelay:'1s'  },
-  { left:'85%', top:'75%', animDur:'6.5s',animDelay:'3s'  },
-  { left:'42%', top:'80%', animDur:'10s', animDelay:'5s'  },
-];
-
-function AnimatedBg() {
-  return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden>
-      {BG_BUTTERFLIES.map((b, i) => <SvgButterfly key={`bf${i}`} {...b} />)}
-      {BG_LEAVES.map((l, i) => <SvgLeaf key={`l${i}`} {...l} />)}
-      {BG_FIREFLIES.map((f, i) => (
-        <SvgFirefly key={`ff${i}`} style={{
-          left: f.left, top: f.top,
-          animation: `fireflyFloat ${f.animDur} ease-in-out ${f.animDelay} infinite`,
-        }} />
-      ))}
     </div>
   );
 }
@@ -4606,7 +4483,6 @@ export default function App() {
       <ErrorBoundary>
         {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
         <div className="min-h-screen text-slate-100">
-          <AnimatedBg />
           <Navbar
             active={page}
             onNav={onNav}
