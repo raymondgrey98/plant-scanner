@@ -161,11 +161,21 @@ app.get('/api/providers', (_req, res) => {
 });
 
 // ── Global error handler ──────────────────────────────────────
+const USER_FACING_PATTERNS = [
+  /all ai providers failed/i,
+  /api key/i,
+  /rate limit/i,
+  /quota/i,
+  /only image files/i,
+  /photo is required/i,
+  /file size/i,
+];
 app.use((err, req, res, _next) => {
   const status = err.status || err.statusCode || 500;
   logger.error(`${req.method} ${req.path} — ${err.message}`, { status, stack: err.stack?.slice(0, 300) });
+  const isUserFacing = status < 500 || USER_FACING_PATTERNS.some(p => p.test(err.message));
   res.status(status).json({
-    error:   status >= 500 ? 'Internal server error' : err.message,
+    error: isUserFacing ? err.message : 'Internal server error',
     ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
   });
 });
