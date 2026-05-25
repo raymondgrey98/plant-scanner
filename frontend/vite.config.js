@@ -4,6 +4,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [tailwindcss(), react()],
+  base: '/plant-scanner/',
   server: {
     port: 5173,
     proxy: {
