@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">FloraIQ</string>
+    <string name="title_activity_main">FloraIQ</string>
+    <string name="package_name">com.floraiq.app</string>
+    <string name="custom_url_scheme">com.floraiq.app</string>
+</resources>

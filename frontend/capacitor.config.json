@@ -1,0 +1,18 @@
+{
+  "appId": "com.floraiq.app",
+  "appName": "FloraIQ",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "Camera": {
+      "saveToGallery": false
+    }
+  }
+}

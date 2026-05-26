@@ -140,21 +140,28 @@ const Card = ({ children, className = '', onClick }) => (
 );
 
 const Badge = ({ children, color = 'zinc' }) => {
-  const colors = { zinc: 'bg-zinc-800 text-zinc-400', green: 'bg-green-500/10 text-green-400 border border-green-500/20', blue: 'bg-blue-500/10 text-blue-400 border border-blue-500/20', amber: 'bg-amber-500/10 text-amber-400 border border-amber-500/20', purple: 'bg-purple-500/10 text-purple-400 border border-purple-500/20', red: 'bg-red-500/10 text-red-400 border border-red-500/20' };
+  const colors = {
+    zinc:   'bg-gray-100 text-gray-600',
+    green:  'bg-green-50 text-green-700 border border-green-200',
+    blue:   'bg-blue-50 text-blue-700 border border-blue-200',
+    amber:  'bg-amber-50 text-amber-700 border border-amber-200',
+    purple: 'bg-purple-50 text-purple-700 border border-purple-200',
+    red:    'bg-red-50 text-red-700 border border-red-200',
+  };
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${colors[color] || colors.zinc}`}>{children}</span>;
 };
 
 const Btn = ({ children, onClick, variant = 'primary', size = 'md', className = '', disabled, type = 'button' }) => {
   const variants = {
-    primary: 'btn-violet',
-    secondary: 'bg-white/5 hover:bg-white/10 text-zinc-200 border border-white/8',
-    danger: 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30',
-    survival: 'bg-amber-500 hover:bg-amber-400 text-black font-bold',
-    ghost: 'text-zinc-400 hover:text-zinc-200 hover:bg-white/5',
+    primary:  'btn-violet',
+    secondary: 'bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 shadow-sm',
+    danger:   'bg-red-50 hover:bg-red-100 text-red-600 border border-red-200',
+    survival: 'bg-amber-500 hover:bg-amber-400 text-white font-bold shadow-md',
+    ghost:    'text-gray-500 hover:text-gray-800 hover:bg-gray-100',
   };
   const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-6 py-3 text-base' };
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className={`rounded-lg transition-colors inline-flex items-center justify-center gap-1.5 ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
+    <button type={type} onClick={onClick} disabled={disabled} className={`rounded-xl transition-all inline-flex items-center justify-center gap-1.5 font-semibold ${variants[variant]} ${sizes[size]} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}>
       {children}
     </button>
   );
@@ -162,16 +169,16 @@ const Btn = ({ children, onClick, variant = 'primary', size = 'md', className = 
 
 const Input = ({ label, error, className = '', ...props }) => (
   <div className={className}>
-    {label && <label className="block text-xs font-medium text-zinc-400 mb-1">{label}</label>}
-    <input {...props} className={`w-full px-3 py-2 bg-white/5 border ${error ? 'border-red-500' : 'border-white/10'} rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors`} />
-    {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
+    {label && <label className="block text-xs font-semibold text-gray-600 mb-1.5">{label}</label>}
+    <input {...props} className={`w-full px-4 py-2.5 bg-gray-50 border ${error ? 'border-red-400' : 'border-gray-200'} rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:bg-white transition-colors`} />
+    {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
   </div>
 );
 
 const Textarea = ({ label, className = '', ...props }) => (
   <div className={className}>
-    {label && <label className="block text-xs font-medium text-zinc-400 mb-1">{label}</label>}
-    <textarea {...props} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-violet-500 transition-colors resize-none" />
+    {label && <label className="block text-xs font-semibold text-gray-600 mb-1.5">{label}</label>}
+    <textarea {...props} className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-500 focus:bg-white transition-colors resize-none" />
   </div>
 );
 
@@ -184,12 +191,12 @@ function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative glass-card w-full max-w-lg overflow-y-auto max-h-[90vh]" style={{ background: 'rgba(8,8,22,0.95)' }}>
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative glass-card w-full max-w-lg overflow-y-auto max-h-[90vh] bg-white">
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">
-            <h3 className="font-semibold text-zinc-100">{title}</h3>
-            <button onClick={onClose} className="text-zinc-600 hover:text-zinc-400 text-xl leading-none">×</button>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 className="font-bold text-gray-900">{title}</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100">×</button>
           </div>
         )}
         <div className="p-6">{children}</div>
@@ -200,14 +207,14 @@ function Modal({ open, onClose, title, children }) {
 
 const DangerLevel = ({ level }) => {
   const levels = {
-    SAFE:      { bg: 'bg-green-500/10',  border: 'border-green-500/30',  text: 'text-green-400',  dot: 'bg-green-400' },
-    CAUTION:   { bg: 'bg-amber-500/10',  border: 'border-amber-500/30',  text: 'text-amber-400',  dot: 'bg-amber-400' },
-    DANGEROUS: { bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', dot: 'bg-orange-400' },
-    DEADLY:    { bg: 'bg-red-500/10',    border: 'border-red-500/30',    text: 'text-red-400',    dot: 'bg-red-400' },
+    SAFE:      { cls: 'danger-safe',      dot: 'bg-green-500' },
+    CAUTION:   { cls: 'danger-caution',   dot: 'bg-amber-500' },
+    DANGEROUS: { cls: 'danger-dangerous', dot: 'bg-orange-500' },
+    DEADLY:    { cls: 'danger-deadly',    dot: 'bg-red-500' },
   };
   const l = levels[level?.toUpperCase()] || levels.CAUTION;
   return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${l.bg} ${l.border} ${l.text}`}>
+    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${l.cls}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${l.dot}`} />
       {level || 'UNKNOWN'}
     </span>
@@ -217,7 +224,7 @@ const DangerLevel = ({ level }) => {
 // ── Notifications ─────────────────────────────────────────────
 function NotifBell({ count, onClick }) {
   return (
-    <button onClick={onClick} className="relative p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors">
+    <button onClick={onClick} className="relative p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-colors">
       🔔
       {count > 0 && <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center">{count > 9 ? '9+' : count}</span>}
     </button>
@@ -244,22 +251,25 @@ function NotifPanel({ open, onClose }) {
   };
   if (!open) return null;
   return (
-    <div className="absolute right-0 top-14 z-50 w-80 bg-zinc-950 border border-zinc-800 rounded-2xl shadow-2xl">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
-        <span className="text-sm font-semibold text-zinc-200">Notifications</span>
+    <div className="absolute right-0 top-14 z-50 w-80 bg-white border border-gray-200 rounded-2xl shadow-xl">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <span className="text-sm font-bold text-gray-900">Notifications</span>
         <div className="flex items-center gap-2">
-          <button onClick={markAll} className="text-xs text-zinc-500 hover:text-zinc-300">Mark all read</button>
-          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-400">×</button>
+          <button onClick={markAll} className="text-xs text-green-600 hover:text-green-700 font-medium">Mark all read</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">×</button>
         </div>
       </div>
-      <div className="max-h-80 overflow-y-auto divide-y divide-zinc-800/60">
-        {loading && <p className="px-4 py-6 text-sm text-zinc-500 text-center">Loading…</p>}
-        {!loading && notifs.length === 0 && <p className="px-4 py-6 text-sm text-zinc-600 text-center">No notifications</p>}
+      <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+        {loading && <p className="px-4 py-6 text-sm text-gray-400 text-center">Loading…</p>}
+        {!loading && notifs.length === 0 && <p className="px-4 py-6 text-sm text-gray-400 text-center">No notifications</p>}
         {notifs.map(n => (
-          <div key={n.id} onClick={() => markRead(n.id)} className={`px-4 py-3 cursor-pointer hover:bg-zinc-900 transition-colors ${n.read ? 'opacity-50' : ''}`}>
-            <p className="text-xs font-medium text-zinc-200">{n.title || n.type}</p>
-            {n.message && <p className="text-xs text-zinc-500 mt-0.5 truncate">{n.message}</p>}
-            {!n.read && <span className="inline-block w-1.5 h-1.5 bg-green-400 rounded-full ml-auto" />}
+          <div key={n.id} onClick={() => markRead(n.id)} className={`px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors flex items-start gap-3 ${n.read ? 'opacity-50' : ''}`}>
+            <span className="text-lg mt-0.5">🔔</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-gray-900">{n.title || n.type}</p>
+              {n.message && <p className="text-xs text-gray-500 mt-0.5 truncate">{n.message}</p>}
+            </div>
+            {!n.read && <span className="w-2 h-2 bg-green-500 rounded-full mt-1 shrink-0" />}
           </div>
         ))}
       </div>
@@ -283,11 +293,11 @@ const NAV_ITEMS = [
 ];
 
 const BOTTOM_NAV = [
-  { id: 'home',      label: 'Home',    icon: '🏠' },
-  { id: 'scan',      label: 'Scan',    icon: '📷' },
-  { id: 'sos',       label: 'SOS',     icon: '🆘' },
-  { id: 'landscape', label: 'Terrain', icon: '🌍' },
-  { id: 'map',       label: 'Map',     icon: '🗺️' },
+  { id: 'home',     label: 'Home',     icon: '🏠' },
+  { id: 'garden',   label: 'Garden',   icon: '🌿' },
+  { id: 'identify', label: 'Identify', icon: '📷', center: true },
+  { id: 'explore',  label: 'Explore',  icon: '🔍' },
+  { id: 'me',       label: 'Me',       icon: '👤' },
 ];
 
 function Navbar({ active, onNav, notifCount, onOpenNotifs, showNotifs, onCloseNotifs }) {
@@ -295,16 +305,17 @@ function Navbar({ active, onNav, notifCount, onOpenNotifs, showNotifs, onCloseNo
   const online = useOnlineStatus();
   const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-50 glass-nav border-b">
+    <header className="sticky top-0 z-50 glass-nav border-b border-gray-100">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-14 relative">
-        <button onClick={() => onNav('home')} className="font-display font-extrabold text-lg text-white tracking-tight shrink-0">
+        <button onClick={() => onNav('home')} className="font-bold text-xl text-gray-900 tracking-tight shrink-0 flex items-center gap-1">
+          <span className="text-2xl">🌿</span>
           Flora<span className="gradient-text">IQ</span>
-          {!online && <span className="ml-2 text-xs bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full px-2 py-0.5">Offline</span>}
+          {!online && <span className="ml-2 text-xs bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2 py-0.5 font-medium">Offline</span>}
         </button>
         <nav className="hidden lg:flex items-center gap-1 mx-4">
           {NAV_ITEMS.map(n => (
             <button key={n.id} onClick={() => onNav(n.id)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${active === n.id ? 'bg-violet-500/20 text-violet-300 border border-violet-500/25' : 'text-slate-400 hover:text-white hover:bg-white/6'}`}>
+              className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${active === n.id ? 'bg-green-50 text-green-700 font-semibold' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
               {n.icon} {n.label}
             </button>
           ))}
@@ -313,36 +324,38 @@ function Navbar({ active, onNav, notifCount, onOpenNotifs, showNotifs, onCloseNo
           <LangSwitcher />
           {user && <NotifBell count={notifCount} onClick={onOpenNotifs} />}
           {user?.role === 'admin' && (
-            <button onClick={() => onNav('admin')} className="hidden sm:flex px-2 py-1.5 text-xs font-bold text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 rounded-lg transition-colors">⚙️ Admin</button>
+            <button onClick={() => onNav('admin')} className="hidden sm:flex px-2 py-1.5 text-xs font-bold text-purple-600 hover:bg-purple-50 rounded-xl transition-colors">⚙️ Admin</button>
           )}
           {user ? (
-            <button onClick={() => onNav('profile')} className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors">
+            <button onClick={() => onNav('profile')} className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-100 transition-colors">
               👤 {user.name?.split(' ')[0]}
             </button>
           ) : (
             <>
-              <button onClick={() => onNav('login')} className="px-3 py-1.5 text-xs font-medium text-slate-400 hover:text-white hover:bg-white/6 rounded-lg transition-colors">Sign in</button>
-              <button onClick={() => onNav('signup')} className="btn-violet px-3 py-1.5 text-xs rounded-lg">Sign up</button>
+              <button onClick={() => onNav('login')} className="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors">Sign in</button>
+              <button onClick={() => onNav('signup')} className="btn-violet px-4 py-1.5 text-sm rounded-xl">Sign up</button>
             </>
           )}
-          <button onClick={() => setMenuOpen(o => !o)} className="lg:hidden p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-lg transition-colors text-lg">☰</button>
+          <button onClick={() => setMenuOpen(o => !o)} className="lg:hidden p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors text-lg">☰</button>
         </div>
         <NotifPanel open={showNotifs} onClose={onCloseNotifs} />
         {menuOpen && (
-          <div className="lg:hidden absolute right-4 top-14 z-50 glass-card py-2 w-52 shadow-2xl">
+          <div className="lg:hidden absolute right-4 top-14 z-50 bg-white border border-gray-200 rounded-2xl py-2 w-56 shadow-xl">
             {NAV_ITEMS.map(n => (
               <button key={n.id} onClick={() => { onNav(n.id); setMenuOpen(false); }}
-                className={`flex items-center gap-2 text-left px-3 py-2.5 rounded-lg text-sm font-medium mb-0.5 mx-1 transition-colors ${active === n.id ? 'bg-violet-500/20 text-violet-300' : 'text-slate-400 hover:bg-white/6'}`}>
+                className={`flex items-center gap-2 text-left px-4 py-2.5 text-sm font-medium w-full transition-colors ${active === n.id ? 'text-green-700 bg-green-50' : 'text-gray-600 hover:bg-gray-50'}`}>
                 {n.icon} {n.label}
               </button>
             ))}
-            {user && <button onClick={() => { onNav('profile'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 mb-0.5 mx-1">👤 Profile</button>}
-            {user?.role === 'admin' && <button onClick={() => { onNav('admin'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-purple-400 mb-0.5 mx-1">⚙️ Admin</button>}
-            {user && <button onClick={() => { onNav('favorites'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 mx-1">❤️ Favorites</button>}
-            {!user && <>
-              <button onClick={() => { onNav('login'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-3 py-2.5 rounded-lg text-sm text-zinc-400 mx-1">Sign in</button>
-              <button onClick={() => { onNav('signup'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-3 py-2.5 rounded-lg text-sm font-bold text-green-400 bg-green-500/10 mx-1">Sign up</button>
-            </>}
+            {user && <button onClick={() => { onNav('profile'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">👤 Profile</button>}
+            {user?.role === 'admin' && <button onClick={() => { onNav('admin'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm font-bold text-purple-600 hover:bg-purple-50">⚙️ Admin</button>}
+            {user && <button onClick={() => { onNav('favorites'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50">❤️ Favorites</button>}
+            {!user && (
+              <div className="border-t border-gray-100 mt-1 pt-1">
+                <button onClick={() => { onNav('login'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm text-gray-600 hover:bg-gray-50">Sign in</button>
+                <button onClick={() => { onNav('signup'); setMenuOpen(false); }} className="flex items-center gap-2 w-full text-left px-4 py-2.5 text-sm font-bold text-green-700 bg-green-50 hover:bg-green-100 mx-2 rounded-xl w-auto">Sign up free</button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -352,12 +365,22 @@ function Navbar({ active, onNav, notifCount, onOpenNotifs, showNotifs, onCloseNo
 
 function BottomNav({ active, onNav }) {
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 glass-nav border-t flex">
-      {BOTTOM_NAV.map(n => (
+    <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-100 flex items-end"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)', boxShadow: '0 -2px 16px rgba(0,0,0,0.07)' }}>
+      {BOTTOM_NAV.map(n => n.center ? (
         <button key={n.id} onClick={() => onNav(n.id)}
-          className={`flex-1 flex flex-col items-center py-2 gap-0.5 transition-colors ${active === n.id ? 'text-violet-400' : 'text-slate-500'}`}>
-          <span className="text-lg">{n.icon}</span>
-          <span className="text-[9px] font-medium">{n.label}</span>
+          className="flex-1 flex flex-col items-center pb-2 -translate-y-3">
+          <div className={`w-[58px] h-[58px] rounded-full bg-green-500 border-4 border-white flex items-center justify-center text-2xl transition-all ${active === n.id ? 'scale-110' : ''}`}
+            style={{ boxShadow: active === n.id ? '0 6px 22px rgba(60,180,95,0.55)' : '0 4px 14px rgba(60,180,95,0.42)' }}>
+            📷
+          </div>
+          <span className={`text-[10px] font-semibold mt-1 ${active === n.id ? 'text-green-600' : 'text-gray-400'}`}>{n.label}</span>
+        </button>
+      ) : (
+        <button key={n.id} onClick={() => onNav(n.id)}
+          className={`flex-1 flex flex-col items-center py-3 gap-0.5 transition-colors ${active === n.id ? 'text-green-600' : 'text-gray-400'}`}>
+          <span className="text-xl">{n.icon}</span>
+          <span className={`text-[10px] font-semibold ${active === n.id ? 'text-green-600' : 'text-gray-400'}`}>{n.label}</span>
         </button>
       ))}
     </nav>
@@ -378,23 +401,24 @@ function LoginPage({ onNav }) {
     finally { setLoading(false); }
   };
   return (
-    <div className="max-w-sm mx-auto mt-16 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12" style={{ background: 'linear-gradient(160deg,#3CB45F 0%,#2E9E52 50%,#F2F7F2 100%)' }}>
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-extrabold text-white mb-1">Welcome back</h1>
-        <p className="text-sm text-zinc-500">Sign in to FloraIQ</p>
+        <div className="text-5xl mb-3">🌿</div>
+        <h1 className="text-3xl font-extrabold text-white mb-1">Welcome back</h1>
+        <p className="text-green-100 text-sm">Sign in to FloraIQ</p>
       </div>
-      <Card className="p-6">
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8">
         <form onSubmit={submit} className="space-y-4">
           <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
           <Input label="Password" type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="••••••••" required />
-          {err && <p className="text-xs text-red-400">{err}</p>}
-          <Btn type="submit" disabled={loading} className="w-full">{loading ? 'Signing in…' : 'Sign In'}</Btn>
-          <div className="flex items-center justify-between pt-2">
-            <button type="button" onClick={() => onNav('forgot')} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Forgot password?</button>
-            <p className="text-xs text-zinc-600">No account? <button type="button" onClick={() => onNav('signup')} className="text-green-400 hover:text-green-300 font-medium transition-colors">Sign up free</button></p>
+          {err && <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{err}</p>}
+          <Btn type="submit" disabled={loading} className="w-full py-3 text-base rounded-2xl">{loading ? 'Signing in…' : 'Sign In'}</Btn>
+          <div className="flex items-center justify-between pt-1">
+            <button type="button" onClick={() => onNav('forgot')} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">Forgot password?</button>
+            <p className="text-xs text-gray-500">No account? <button type="button" onClick={() => onNav('signup')} className="text-green-600 hover:text-green-700 font-semibold transition-colors">Sign up free</button></p>
           </div>
         </form>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -413,21 +437,22 @@ function SignupPage({ onNav }) {
     finally { setLoading(false); }
   };
   return (
-    <div className="max-w-sm mx-auto mt-16 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12" style={{ background: 'linear-gradient(160deg,#3CB45F 0%,#2E9E52 50%,#F2F7F2 100%)' }}>
       <div className="text-center mb-8">
-        <h1 className="text-2xl font-extrabold text-white mb-1">Create account</h1>
-        <p className="text-sm text-zinc-500">Join FloraIQ — free forever</p>
+        <div className="text-5xl mb-3">🌱</div>
+        <h1 className="text-3xl font-extrabold text-white mb-1">Create account</h1>
+        <p className="text-green-100 text-sm">Join FloraIQ — free forever</p>
       </div>
-      <Card className="p-6">
+      <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-8">
         <form onSubmit={submit} className="space-y-4">
-          <Input label="Name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" required />
+          <Input label="Full Name" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" required />
           <Input label="Email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
           <Input label="Password" type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Min 8 characters" minLength={8} required />
-          {err && <p className="text-xs text-red-400">{err}</p>}
-          <Btn type="submit" disabled={loading} className="w-full">{loading ? 'Creating…' : 'Create Account'}</Btn>
-          <p className="mt-4 text-center text-xs text-zinc-600">Already have an account? <button type="button" onClick={() => onNav('login')} className="text-green-400 hover:text-green-300 font-medium transition-colors">Sign in</button></p>
+          {err && <p className="text-xs text-red-500 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{err}</p>}
+          <Btn type="submit" disabled={loading} className="w-full py-3 text-base rounded-2xl">{loading ? 'Creating…' : 'Create Free Account'}</Btn>
+          <p className="text-center text-xs text-gray-500 pt-1">Already have an account? <button type="button" onClick={() => onNav('login')} className="text-green-600 hover:text-green-700 font-semibold transition-colors">Sign in</button></p>
         </form>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -462,9 +487,10 @@ function ForgotPage({ onNav }) {
   );
 }
 
-// ── Plant Card ────────────────────────────────────────────────
+// ── Plant Card (Picture This style) ──────────────────────────
 function PlantCard({ plant, onFavorite }) {
   const [imgSrc, setImgSrc] = useState(plant.image_url || null);
+  const [loved, setLoved] = useState(false);
   useEffect(() => {
     if (imgSrc) return;
     const name = plant.scientific_name || plant.common_name;
@@ -475,24 +501,42 @@ function PlantCard({ plant, onFavorite }) {
     return () => ctrl.abort();
   }, [plant.scientific_name, plant.common_name]);
 
+  const handleLove = e => {
+    e.stopPropagation();
+    setLoved(l => !l);
+    if (onFavorite) onFavorite(plant);
+  };
+
+  const traits = [
+    plant.family && plant.family,
+    plant.edible && 'Edible',
+    plant.medicinal && 'Medicinal',
+    plant.toxic && 'Toxic',
+  ].filter(Boolean).slice(0, 3);
+
   return (
-    <Card className="overflow-hidden group">
-      {imgSrc && <img src={imgSrc} alt={plant.common_name} className="w-full h-36 object-cover" onError={() => setImgSrc(null)} />}
-      {!imgSrc && <div className="w-full h-36 bg-zinc-800/60 flex items-center justify-center text-4xl">🌿</div>}
-      <div className="p-3">
-        <p className="text-sm font-semibold text-zinc-100 truncate">{plant.common_name || plant.name}</p>
-        {plant.scientific_name && <p className="text-xs italic text-zinc-500 truncate">{plant.scientific_name}</p>}
-        <div className="flex items-center gap-1 mt-2 flex-wrap">
-          {plant.family && <Badge color="green">{plant.family}</Badge>}
-          {plant.edible && <Badge color="amber">Edible</Badge>}
-          {plant.medicinal && <Badge color="blue">Medicinal</Badge>}
-          {plant.toxic && <Badge color="red">Toxic</Badge>}
+    <div className="plant-list-card">
+      {imgSrc
+        ? <img src={imgSrc} alt={plant.common_name} className="plant-list-img" onError={() => setImgSrc(null)} />
+        : <div className="plant-list-img flex items-center justify-center text-3xl bg-green-50">🌿</div>
+      }
+      <div className="flex-1 py-3 pr-3 flex flex-col justify-between min-w-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-gray-900 truncate">{plant.common_name || plant.name}</p>
+            {plant.scientific_name && <p className="text-xs italic text-gray-400 truncate">{plant.scientific_name}</p>}
+          </div>
+          <button onClick={handleLove} className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-all ${loved ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400 hover:bg-green-50 hover:text-green-500'}`}>
+            {loved ? '♥' : '♡'}
+          </button>
         </div>
-        {onFavorite && (
-          <button onClick={() => onFavorite(plant)} className="mt-2 text-xs text-zinc-600 hover:text-red-400 transition-colors">♡ Save</button>
+        {traits.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-2">
+            {traits.map(t => <span key={t} className="plant-trait-tag">{t}</span>)}
+          </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -4479,24 +4523,654 @@ function SOSPage() {
   );
 }
 
+// ── Mobile Header ─────────────────────────────────────────────
+const SUB_PAGES = ['sos','survival','landscape','map','farming','farm-ops','library','journal','history','favorites','profile','admin','scan'];
+function MobileHeader({ page, onNav, notifCount, showNotifs, onOpenNotifs, onCloseNotifs }) {
+  const { user } = useAuth();
+  const isSubPage = SUB_PAGES.includes(page);
+  return (
+    <header className="sticky top-0 z-40 bg-white border-b border-gray-100 px-4 h-14 flex items-center justify-between relative"
+      style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+      {isSubPage ? (
+        <button onClick={() => onNav(SUB_PAGES.includes(page) && ['history','favorites','profile','admin'].includes(page) ? 'me' : 'explore')}
+          className="flex items-center gap-1.5 text-gray-700 font-semibold text-sm hover:text-green-600 transition-colors">
+          ← Back
+        </button>
+      ) : (
+        <button onClick={() => onNav('home')} className="font-extrabold text-xl text-gray-900 flex items-center gap-1.5">
+          <span className="text-2xl">🌿</span>
+          Flora<span className="text-green-500">IQ</span>
+        </button>
+      )}
+      <div className="flex items-center gap-2">
+        <LangSwitcher />
+        {user && <NotifBell count={notifCount} onClick={onOpenNotifs} />}
+      </div>
+      <NotifPanel open={showNotifs} onClose={onCloseNotifs} />
+    </header>
+  );
+}
+
+// ── Home Screen (PictureThis "My Garden" style) ───────────────
+function HomeScreen({ onNav }) {
+  const { user } = useAuth();
+  const [reminders, setReminders] = useState([]);
+  const [recentScans, setRecentScans] = useState([]);
+  const [stats, setStats] = useState(null);
+
+  useEffect(() => {
+    fetch(`${API}/map/stats`).then(r => r.json()).then(setStats).catch(() => {});
+    if (user) {
+      fetch(`${API}/reminders`, { credentials: 'include' })
+        .then(r => r.json()).then(d => setReminders(Array.isArray(d) ? d.slice(0, 3) : [])).catch(() => {});
+      fetch(`${API}/scans?page=1&limit=4`, { credentials: 'include' })
+        .then(r => r.json()).then(d => setRecentScans(Array.isArray(d.scans) ? d.scans : [])).catch(() => {});
+    }
+  }, [user]);
+
+  return (
+    <div className="pb-24">
+      {/* Green hero header */}
+      <div style={{ background: 'linear-gradient(160deg, #3CB45F 0%, #2E9E52 100%)' }} className="px-5 pt-6 pb-8">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <p className="text-green-100 text-sm font-medium">Good day 🌿</p>
+            <h1 className="text-2xl font-extrabold text-white mt-0.5">
+              {user ? `Hi, ${user.name?.split(' ')[0]}!` : 'Welcome to FloraIQ'}
+            </h1>
+          </div>
+          {!user && (
+            <button onClick={() => onNav('login')}
+              className="px-4 py-2 bg-white/20 text-white text-sm font-bold rounded-2xl border border-white/30 hover:bg-white/30 transition-colors">
+              Sign In
+            </button>
+          )}
+        </div>
+        {/* Quick scan banner */}
+        <button onClick={() => onNav('identify')}
+          className="w-full py-4 bg-white rounded-2xl flex items-center gap-3 px-4 active:scale-[0.98] transition-transform"
+          style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
+          <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center text-xl shrink-0">📷</div>
+          <div className="text-left flex-1">
+            <p className="font-bold text-gray-900 text-sm">Identify a Plant</p>
+            <p className="text-xs text-gray-400 mt-0.5">Point your camera at any plant or organism</p>
+          </div>
+          <span className="text-green-500 text-lg font-bold">→</span>
+        </button>
+      </div>
+
+      <div className="px-4 -mt-1 space-y-5 pt-4">
+        {/* Today's care tasks */}
+        {reminders.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-extrabold text-gray-900">Today's Tasks</h2>
+              <button onClick={() => onNav('garden')} className="text-xs text-green-600 font-bold">See all →</button>
+            </div>
+            <div className="space-y-2">
+              {reminders.map((r, i) => (
+                <div key={i} className="reminder-card flex items-center gap-3 px-4 py-3">
+                  <div className={`care-icon ${r.type === 'water' ? 'water' : r.type === 'fertilize' ? 'fertilize' : 'repot'}`}>
+                    {r.type === 'water' ? '💧' : r.type === 'fertilize' ? '🌱' : '🪴'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{r.title || `Time to ${r.type}`}</p>
+                    <p className="text-xs text-gray-400 truncate">{r.plant_name || 'Your plant'}</p>
+                  </div>
+                  <button className="reminder-action-btn done">✓</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Recent scans */}
+        {recentScans.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-extrabold text-gray-900">Recent Scans</h2>
+              <button onClick={() => onNav('history')} className="text-xs text-green-600 font-bold">See all →</button>
+            </div>
+            <div className="space-y-2">
+              {recentScans.map(s => (
+                <div key={s.id} className="plant-list-card">
+                  {s.image_url
+                    ? <img src={s.image_url} className="plant-list-img" alt={s.common_name} onError={e => e.target.style.display='none'} />
+                    : <div className="plant-list-img flex items-center justify-center text-3xl bg-green-50">🌿</div>}
+                  <div className="flex-1 py-3 pr-3 flex flex-col justify-center min-w-0">
+                    <p className="text-sm font-bold text-gray-900 truncate">{s.common_name || 'Unknown'}</p>
+                    {s.scientific_name && <p className="text-xs italic text-gray-400 truncate">{s.scientific_name}</p>}
+                    <p className="text-xs text-gray-400 mt-1">{new Date(s.created_at).toLocaleDateString()}</p>
+                  </div>
+                  {s.confidence && <span className="text-xs text-green-600 font-bold pr-3">{s.confidence}%</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick feature shortcuts */}
+        <div>
+          <h2 className="font-extrabold text-gray-900 mb-3">Quick Access</h2>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { icon: '🆘', label: 'SOS',      page: 'sos' },
+              { icon: '🏕️', label: 'Survival',  page: 'survival' },
+              { icon: '🌍', label: 'Terrain',   page: 'landscape' },
+              { icon: '🗺️', label: 'Map',       page: 'map' },
+              { icon: '🌾', label: 'Farm',      page: 'farming' },
+              { icon: '📚', label: 'Library',   page: 'library' },
+              { icon: '📓', label: 'Journal',   page: 'journal' },
+              { icon: '🔍', label: 'Explore',   page: 'explore' },
+            ].map(f => (
+              <button key={f.page} onClick={() => onNav(f.page)}
+                className="flex flex-col items-center gap-1.5 p-3 bg-white rounded-2xl border border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all"
+                style={{ boxShadow: '0 1px 6px rgba(0,0,0,0.05)' }}>
+                <span className="text-2xl">{f.icon}</span>
+                <span className="text-[11px] font-semibold text-gray-600">{f.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Community stats */}
+        {stats && (
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { value: stats.total_scans, label: 'Total Scans', color: 'text-green-600' },
+              { value: stats.species_count, label: 'Species', color: 'text-blue-600' },
+              { value: stats.country_count, label: 'Countries', color: 'text-purple-600' },
+            ].map(s => (
+              <div key={s.label} className="glass-card p-4 text-center">
+                <p className={`text-xl font-extrabold ${s.color}`}>{(s.value || 0).toLocaleString()}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Sign-up CTA for guests */}
+        {!user && (
+          <div className="glass-card p-6 text-center">
+            <div className="text-4xl mb-3">🌱</div>
+            <h3 className="font-bold text-gray-900 mb-1">Build your plant collection</h3>
+            <p className="text-sm text-gray-500 mb-4">Save scans, track your garden, and get care reminders. Free forever.</p>
+            <div className="flex gap-2">
+              <button onClick={() => onNav('signup')} className="flex-1 btn-violet py-3 rounded-xl text-sm">Sign up free</button>
+              <button onClick={() => onNav('login')} className="flex-1 py-3 rounded-xl text-sm font-semibold text-gray-600 border border-gray-200 hover:bg-gray-50 transition-colors">Sign in</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Identify Screen (PictureThis full-screen camera) ──────────
+function IdentifyScreen({ onNav }) {
+  const { user } = useAuth();
+  const videoRef = useRef(null);
+  const fileRef = useRef(null);
+  const streamRef = useRef(null);
+  const [mode, setMode] = useState('plant');
+  const [cameraActive, setCameraActive] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  const [celebrate, setCelebrate] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const startCamera = async () => {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+      streamRef.current = s;
+      setCameraActive(true);
+      if (videoRef.current) videoRef.current.srcObject = s;
+      else setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = s; }, 80);
+    } catch { setCameraActive(false); }
+  };
+
+  const stopCamera = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    streamRef.current = null;
+    setCameraActive(false);
+    if (videoRef.current) videoRef.current.srcObject = null;
+  };
+
+  useEffect(() => {
+    startCamera();
+    return stopCamera;
+  }, []);
+
+  const analyzeImage = async f => {
+    setLoading(true); setError(''); setResult(null);
+    const fd = new FormData();
+    fd.append('photo', f);
+    fd.append('mode', mode);
+    try {
+      const r = await fetch(`${API}/scans`, { method: 'POST', credentials: 'include', body: fd });
+      const d = await safeJson(r);
+      if (!r.ok) throw new Error(d.error || 'Analysis failed');
+      setResult(d);
+      setCelebrate(true);
+      setSheetOpen(true);
+      setTimeout(() => setCelebrate(false), 2000);
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  const capture = () => {
+    if (!videoRef.current || !cameraActive) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    canvas.getContext('2d').drawImage(videoRef.current, 0, 0);
+    canvas.toBlob(blob => {
+      const f = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
+      setPreview(canvas.toDataURL());
+      stopCamera();
+      analyzeImage(f);
+    }, 'image/jpeg', 0.9);
+  };
+
+  const pickGallery = e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = ev => setPreview(ev.target.result);
+    reader.readAsDataURL(f);
+    stopCamera();
+    analyzeImage(f);
+  };
+
+  const reset = () => {
+    setPreview(null); setResult(null); setError(''); setSheetOpen(false);
+    startCamera();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-black flex flex-col">
+      {/* Top bar */}
+      <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-5"
+        style={{ paddingTop: 'max(16px, env(safe-area-inset-top))', background: 'linear-gradient(to bottom, rgba(0,0,0,0.65), transparent)', paddingBottom: 20 }}>
+        <button onClick={() => { stopCamera(); onNav('home'); }}
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-black/40 text-white text-xl hover:bg-black/60 transition-colors">
+          ←
+        </button>
+        <p className="text-white font-bold text-base tracking-wide">Identify</p>
+        <div className="w-10 h-10" />
+      </div>
+
+      {/* Camera / Preview */}
+      <div className="flex-1 relative overflow-hidden camera-frame">
+        {preview
+          ? <img src={preview} className="w-full h-full object-cover" alt="Captured" />
+          : <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />}
+
+        {/* Corner brackets */}
+        {!loading && !sheetOpen && (
+          <>
+            <div className="camera-corner tl" />
+            <div className="camera-corner tr" />
+            <div className="camera-corner bl" />
+            <div className="camera-corner br" />
+          </>
+        )}
+
+        {/* Scan line animation */}
+        {loading && <div className="scan-line" />}
+
+        {/* Loading overlay */}
+        {loading && (
+          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center">
+            <div className="w-16 h-16 border-4 border-white/30 border-t-green-400 rounded-full animate-spin mb-5" />
+            <p className="text-white font-bold text-lg">Analyzing...</p>
+            <p className="text-white/60 text-sm mt-1">Multi-model AI · Gemini → GPT-4o → Claude</p>
+          </div>
+        )}
+
+        {/* Error overlay */}
+        {error && !loading && (
+          <div className="absolute inset-x-6 top-24 bg-red-900/90 backdrop-blur border border-red-500 rounded-2xl p-5 text-center">
+            <p className="text-red-200 text-sm font-medium mb-3">⚠️ {error}</p>
+            <button onClick={reset} className="bg-red-600 hover:bg-red-500 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors">
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* No camera fallback */}
+        {!cameraActive && !preview && !loading && !error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-950">
+            <div className="text-6xl mb-4">📷</div>
+            <p className="text-gray-400 font-semibold mb-2">Camera not available</p>
+            <p className="text-gray-600 text-sm mb-6 text-center px-8">Use the gallery button below to pick a photo</p>
+          </div>
+        )}
+      </div>
+
+      {/* Mode selector */}
+      {!sheetOpen && !loading && (
+        <div className="bg-black/85 backdrop-blur-sm px-4 py-3">
+          <div className="flex gap-2 overflow-x-auto pb-0.5 scrollbar-hide">
+            {SCAN_MODES.map(m => (
+              <button key={m.id} onClick={() => setMode(m.id)}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all
+                  ${mode === m.id ? 'bg-green-500 text-white shadow-lg shadow-green-500/30' : 'bg-white/12 text-white/75 hover:bg-white/20'}`}>
+                <span>{m.icon}</span> {m.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bottom controls */}
+      {!sheetOpen && !loading && (
+        <div className="bg-black/90 flex items-center justify-around px-10"
+          style={{ paddingTop: 20, paddingBottom: 'max(28px, env(safe-area-inset-bottom))' }}>
+          {/* Gallery */}
+          <button onClick={() => fileRef.current?.click()}
+            className="w-12 h-12 rounded-2xl border-2 border-white/25 bg-white/10 flex items-center justify-center text-2xl hover:bg-white/20 transition-colors">
+            🖼️
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={pickGallery} />
+
+          {/* Main scan button */}
+          <button onClick={capture} disabled={!cameraActive && !preview}
+            className="w-[72px] h-[72px] rounded-full bg-green-500 border-4 border-white flex items-center justify-center text-3xl transition-all active:scale-95 disabled:opacity-50"
+            style={{ boxShadow: '0 4px 20px rgba(60,180,95,0.55), 0 0 0 2px #3CB45F' }}>
+            📷
+          </button>
+
+          {/* Flip camera placeholder */}
+          <button onClick={async () => { stopCamera(); await startCamera(); }}
+            className="w-12 h-12 rounded-2xl border-2 border-white/25 bg-white/10 flex items-center justify-center text-2xl hover:bg-white/20 transition-colors">
+            🔄
+          </button>
+        </div>
+      )}
+
+      {/* Result bottom sheet */}
+      {sheetOpen && result && (
+        <div className="absolute inset-x-0 bottom-0 z-20 result-sheet overflow-y-auto"
+          style={{ maxHeight: '78vh' }}>
+          <div className="result-drag-handle" />
+          <div className="flex items-start justify-between mb-4 gap-3">
+            <div className="min-w-0">
+              <h3 className="font-extrabold text-gray-900 text-lg truncate">
+                {(result.result || result)?.common_name || (result.result || result)?.plant_name || 'Identified!'}
+              </h3>
+              {(result.result || result)?.scientific_name && (
+                <p className="text-xs italic text-gray-400 mt-0.5">{(result.result || result).scientific_name}</p>
+              )}
+            </div>
+            <button onClick={reset}
+              className="shrink-0 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 text-xl leading-none">
+              ×
+            </button>
+          </div>
+          <ScanResult result={result} />
+          {celebrate && <ResultCelebration mode={mode} />}
+          <div className="mt-4 flex gap-2">
+            <button onClick={reset}
+              className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 rounded-xl text-sm font-semibold text-gray-700 transition-colors">
+              Scan Another
+            </button>
+            {user && (
+              <button onClick={() => { stopCamera(); onNav('history'); }}
+                className="flex-1 py-3 btn-violet rounded-xl text-sm font-semibold">
+                View History
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Garden Screen (My Plants collection) ─────────────────────
+function GardenScreen({ onNav }) {
+  const { user } = useAuth();
+  const [plants, setPlants] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    if (!user) return;
+    setLoading(true);
+    fetch(`${API}/favorites`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(d => setPlants(Array.isArray(d) ? d : []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [user]);
+
+  const filtered = plants.filter(p =>
+    !search || (p.common_name || p.name || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  if (!user) return (
+    <div className="flex flex-col items-center justify-center min-h-[70vh] px-8 text-center">
+      <div className="text-6xl mb-4">🌿</div>
+      <h2 className="text-xl font-extrabold text-gray-900 mb-2">My Garden</h2>
+      <p className="text-gray-500 mb-6 text-sm leading-relaxed">Sign in to save plants and build your personal collection.</p>
+      <button onClick={() => onNav('login')} className="btn-violet px-8 py-3 rounded-xl text-base">Sign In</button>
+    </div>
+  );
+
+  return (
+    <div className="pb-24">
+      <div style={{ background: 'linear-gradient(135deg, #3CB45F, #2E9E52)' }} className="px-5 pt-5 pb-6">
+        <h1 className="text-2xl font-extrabold text-white mb-0.5">My Garden</h1>
+        <p className="text-green-100 text-sm">{plants.length} {plants.length === 1 ? 'plant' : 'plants'} saved</p>
+      </div>
+      <div className="px-4 pt-4 space-y-4">
+        <div className="relative">
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search my plants..."
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-2xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:border-green-400 shadow-sm" />
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">🔍</span>
+        </div>
+
+        {loading && (
+          <div className="flex justify-center py-12">
+            <div className="w-8 h-8 border-3 border-green-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="text-center py-16">
+            <div className="text-5xl mb-4">🌱</div>
+            <p className="text-gray-600 font-semibold mb-1">{search ? 'No plants match' : 'Your garden is empty'}</p>
+            <p className="text-sm text-gray-400 mb-6">Identify plants and save them to your collection</p>
+            <button onClick={() => onNav('identify')} className="btn-violet px-6 py-2.5 rounded-xl text-sm">
+              📷 Identify a Plant
+            </button>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {filtered.map((p, i) => <PlantCard key={p.id || i} plant={p} />)}
+        </div>
+
+        {!loading && filtered.length > 0 && (
+          <button onClick={() => onNav('identify')}
+            className="w-full py-4 border-2 border-dashed border-green-200 rounded-2xl text-green-600 font-semibold text-sm hover:bg-green-50 transition-colors flex items-center justify-center gap-2 bg-white">
+            <span className="text-xl">📷</span> Identify another plant
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Explore Screen (feature hub) ──────────────────────────────
+function ExploreScreen({ onNav }) {
+  const features = [
+    { icon: '🆘', label: 'SOS Scanner',    desc: 'Emergency hazard identification',  page: 'sos',      bg: '#FEF2F2' },
+    { icon: '🏕️', label: 'Survival Mode',  desc: 'Trails, wilderness & safety',      page: 'survival', bg: '#FFFBEB' },
+    { icon: '🌍', label: 'Landscape AI',   desc: 'Terrain & environment analysis',    page: 'landscape',bg: '#EFF6FF' },
+    { icon: '🗺️', label: 'Species Map',    desc: 'Global sightings map',             page: 'map',      bg: '#F5F3FF' },
+    { icon: '🌾', label: 'Farm Planner',   desc: 'AI crop & garden planning',        page: 'farming',  bg: '#ECFDF5' },
+    { icon: '🚜', label: 'Farm Ops',       desc: 'Fields, tasks & inventory',        page: 'farm-ops', bg: '#FFF7ED' },
+    { icon: '📚', label: 'Species Library',desc: '200+ organisms catalogued',        page: 'library',  bg: '#ECFEFF' },
+    { icon: '📓', label: 'Plant Journal',  desc: 'Track plant health & notes',       page: 'journal',  bg: '#F7FEE7' },
+    { icon: '📷', label: 'Advanced Scan',  desc: 'Bulk scan & all ID modes',         page: 'scan',     bg: '#F0FDF4' },
+    { icon: '🕒', label: 'Scan History',   desc: 'All your past identifications',    page: 'history',  bg: '#F9FAFB' },
+    { icon: '❤️', label: 'My Favorites',  desc: 'Saved plants collection',           page: 'favorites',bg: '#FDF2F8' },
+    { icon: '👤', label: 'Profile',        desc: 'Account & settings',               page: 'me',       bg: '#F8FAFC' },
+  ];
+
+  return (
+    <div className="pb-24 px-4 pt-5">
+      <h1 className="text-2xl font-extrabold text-gray-900 mb-1">Explore</h1>
+      <p className="text-sm text-gray-500 mb-5">All FloraIQ features</p>
+      <div className="grid grid-cols-2 gap-3">
+        {features.map(f => (
+          <button key={f.page} onClick={() => onNav(f.page)}
+            className="text-left p-4 rounded-2xl bg-white border border-gray-100 hover:shadow-md active:scale-[0.97] transition-all"
+            style={{ boxShadow: '0 1px 8px rgba(0,0,0,0.05)' }}>
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl mb-3"
+              style={{ background: f.bg }}>
+              {f.icon}
+            </div>
+            <p className="font-bold text-gray-900 text-sm leading-snug">{f.label}</p>
+            <p className="text-xs text-gray-400 mt-0.5 leading-snug">{f.desc}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Me Screen (profile + account hub) ────────────────────────
+function MeScreen({ onNav }) {
+  const { user, logout } = useAuth();
+  const [recentScans, setRecentScans] = useState([]);
+
+  useEffect(() => {
+    if (!user) return;
+    fetch(`${API}/scans?page=1&limit=4`, { credentials: 'include' })
+      .then(r => r.json()).then(d => setRecentScans(Array.isArray(d.scans) ? d.scans : [])).catch(() => {});
+  }, [user]);
+
+  if (!user) return (
+    <div className="flex flex-col items-center justify-center min-h-[70vh] px-8 text-center">
+      <div className="text-6xl mb-4">👤</div>
+      <h2 className="text-xl font-extrabold text-gray-900 mb-2">Sign in to FloraIQ</h2>
+      <p className="text-gray-500 mb-6 text-sm leading-relaxed">Access your scans, garden, and personalized features.</p>
+      <div className="flex flex-col gap-3 w-full max-w-xs">
+        <button onClick={() => onNav('login')} className="btn-violet w-full py-3 rounded-xl text-base">Sign In</button>
+        <button onClick={() => onNav('signup')} className="w-full py-3 rounded-xl border border-gray-200 text-gray-700 font-semibold text-base hover:bg-gray-50 transition-colors">Create Account</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="pb-24">
+      <div style={{ background: 'linear-gradient(135deg, #3CB45F, #2E9E52)' }} className="px-5 pt-6 pb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center text-3xl border-2 border-white/40">
+            👤
+          </div>
+          <div>
+            <h2 className="text-xl font-extrabold text-white">{user.name}</h2>
+            <p className="text-green-100 text-sm">{user.email}</p>
+            {user.role === 'admin' && (
+              <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full mt-1.5 inline-block font-semibold">
+                Admin
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="px-4 -mt-1 pt-3 space-y-4">
+        {recentScans.length > 0 && (
+          <div className="glass-card p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-extrabold text-gray-900 text-sm">Recent Scans</h3>
+              <button onClick={() => onNav('history')} className="text-xs text-green-600 font-bold">See all →</button>
+            </div>
+            <div className="space-y-2 divide-y divide-gray-50">
+              {recentScans.map(s => (
+                <div key={s.id} className="flex items-center gap-3 pt-2 first:pt-0">
+                  {s.image_url
+                    ? <img src={s.image_url} className="w-10 h-10 rounded-xl object-cover shrink-0" alt="" />
+                    : <div className="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-xl shrink-0">🌿</div>}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{s.common_name || 'Unknown'}</p>
+                    <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleDateString()}</p>
+                  </div>
+                  {s.confidence && <span className="text-xs text-green-600 font-bold shrink-0">{s.confidence}%</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="glass-card overflow-hidden divide-y divide-gray-50">
+          {[
+            { icon: '🌿', label: 'My Garden', page: 'garden' },
+            { icon: '🕒', label: 'Scan History', page: 'history' },
+            { icon: '❤️', label: 'My Favorites', page: 'favorites' },
+            { icon: '📓', label: 'Plant Journal', page: 'journal' },
+            ...(user.role === 'admin' ? [{ icon: '⚙️', label: 'Admin Panel', page: 'admin' }] : []),
+          ].map(item => (
+            <button key={item.page} onClick={() => onNav(item.page)}
+              className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left">
+              <span className="text-xl w-7">{item.icon}</span>
+              <span className="text-sm font-semibold text-gray-800 flex-1">{item.label}</span>
+              <span className="text-gray-300 text-sm">›</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="glass-card p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-xl">🌐</span>
+            <span className="text-sm font-semibold text-gray-800">Language</span>
+          </div>
+          <LangSwitcher />
+        </div>
+
+        <button onClick={async () => { await logout(); onNav('home'); }}
+          className="w-full py-3.5 text-red-600 font-semibold text-sm border border-red-100 bg-red-50 hover:bg-red-100 rounded-2xl transition-colors">
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Splash Screen ─────────────────────────────────────────────
 function SplashScreen({ onDone }) {
   const [fading, setFading] = useState(false);
   useEffect(() => {
-    const t1 = setTimeout(() => setFading(true), 2000);
-    const t2 = setTimeout(onDone, 2600);
+    const t1 = setTimeout(() => setFading(true), 1800);
+    const t2 = setTimeout(onDone, 2400);
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, [onDone]);
   return (
-    <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-700 ${fading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
-      style={{ background: '#080808' }}>
-      <div className="flex flex-col items-center gap-6">
-        <div className="w-px h-16 bg-gradient-to-b from-transparent to-[#c9a96e] opacity-60" />
-        <h1 className="font-display text-6xl font-light tracking-[0.15em] text-white" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
-          Flora<span style={{ color: '#c9a96e' }}>IQ</span>
+    <div className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-600 ${fading ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+      style={{ background: 'linear-gradient(160deg, #3CB45F 0%, #2E9E52 55%, #1A7A3C 100%)' }}>
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-20 h-20 bg-white/20 rounded-3xl flex items-center justify-center mb-2 backdrop-blur-sm border border-white/20">
+          <span className="text-5xl">🌿</span>
+        </div>
+        <h1 className="text-5xl font-extrabold text-white tracking-tight">
+          Flora<span style={{ color: '#D4F5DF' }}>IQ</span>
         </h1>
-        <p className="text-xs tracking-[0.35em] uppercase text-zinc-600">Biological Intelligence</p>
-        <div className="w-px h-16 bg-gradient-to-t from-transparent to-[#c9a96e] opacity-60" />
+        <p className="text-sm text-green-100 font-medium tracking-widest uppercase">Plant Intelligence</p>
+        <div className="mt-4 flex gap-1.5">
+          <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse" />
+          <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+          <div className="w-2 h-2 bg-white/25 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+        </div>
       </div>
     </div>
   );
@@ -4593,18 +5267,30 @@ export default function App() {
     <AuthProvider>
       <ErrorBoundary>
         {!splashDone && <SplashScreen onDone={() => setSplashDone(true)} />}
-        <div className="min-h-screen text-slate-100">
-          <Navbar
-            active={page}
-            onNav={onNav}
-            notifCount={notifCount}
-            onOpenNotifs={() => setShowNotifs(true)}
-            showNotifs={showNotifs}
-            onCloseNotifs={() => setShowNotifs(false)}
-          />
-          <main className="pb-24">
-            {page === 'home'      && <HomePage onNav={onNav} />}
-            {page === 'scan'      && <ScanPage onNav={onNav} />}
+        <div className="min-h-screen bg-gray-50">
+          {/* Mobile header — hidden on camera/auth screens */}
+          {!['login','signup','forgot','identify'].includes(page) && (
+            <MobileHeader
+              page={page}
+              onNav={onNav}
+              notifCount={notifCount}
+              showNotifs={showNotifs}
+              onOpenNotifs={() => setShowNotifs(true)}
+              onCloseNotifs={() => setShowNotifs(false)}
+            />
+          )}
+          <main className="pb-20">
+            {/* 5 main tab screens */}
+            {page === 'home'      && <HomeScreen onNav={onNav} />}
+            {page === 'identify'  && <IdentifyScreen onNav={onNav} />}
+            {page === 'garden'    && <GardenScreen onNav={onNav} />}
+            {page === 'explore'   && <ExploreScreen onNav={onNav} />}
+            {page === 'me'        && <MeScreen onNav={onNav} />}
+            {/* Auth pages */}
+            {page === 'login'     && <LoginPage onNav={onNav} />}
+            {page === 'signup'    && <SignupPage onNav={onNav} />}
+            {page === 'forgot'    && <ForgotPage onNav={onNav} />}
+            {/* Feature sub-pages (accessed from Explore/Me) */}
             {page === 'sos'       && <SOSPage />}
             {page === 'history'   && <HistoryPage />}
             {page === 'library'   && <LibraryPage />}
@@ -4617,18 +5303,19 @@ export default function App() {
             {page === 'landscape' && <LandscapePage />}
             {page === 'profile'   && <ProfilePage onNav={onNav} />}
             {page === 'admin'     && <AdminPage />}
-            {page === 'login'     && <LoginPage onNav={onNav} />}
-            {page === 'signup'    && <SignupPage onNav={onNav} />}
-            {page === 'forgot'    && <ForgotPage onNav={onNav} />}
+            {page === 'scan'      && <ScanPage onNav={onNav} />}
           </main>
-          <BottomNav active={page} onNav={onNav} />
+          {/* Hide bottom nav on camera/auth screens */}
+          {!['login','signup','forgot','identify'].includes(page) && (
+            <BottomNav active={page} onNav={onNav} />
+          )}
           <FloraBot />
           {installPrompt && (
-            <div className="fixed bottom-20 left-4 right-4 lg:left-auto lg:right-4 lg:w-80 glass-card p-4 flex items-center justify-between shadow-2xl z-50">
-              <span className="text-sm text-zinc-300">Install FloraIQ for offline use</span>
+            <div className="fixed bottom-20 left-4 right-4 glass-card p-4 flex items-center justify-between shadow-2xl z-50">
+              <span className="text-sm text-gray-700">Install FloraIQ app</span>
               <div className="flex gap-2">
                 <button onClick={installPwa} className="btn-violet px-3 py-1.5 text-xs rounded-lg">Install</button>
-                <button onClick={() => setInstallPrompt(null)} className="text-zinc-600 hover:text-zinc-400 text-xs px-2">×</button>
+                <button onClick={() => setInstallPrompt(null)} className="text-gray-400 hover:text-gray-600 text-xs px-2">×</button>
               </div>
             </div>
           )}
